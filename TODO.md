@@ -34,7 +34,7 @@
 - [ ] Implement StatsBomb loader.
 - [ ] Implement Metrica loader.
 - [ ] Implement SoccerNet loader.
-- [ ] Implement fixture/result loader.
+- [x] Implement generic match catalog loader.
 - [x] Add coordinate normalization utility for 105m x 68m pitch.
 - [ ] Preserve original coordinates alongside normalized coordinates.
 - [ ] Add data lineage columns to each output table.
@@ -51,17 +51,17 @@
 
 - [x] Implement batch planner for local licensed videos.
 - [x] Add example video manifest.
-- [ ] Implement YOLO detector wrapper.
-- [ ] Implement tracker wrapper.
+- [x] Add detector interface and null detector.
+- [x] Add initial tracker interface.
 - [ ] Add ball interpolation with confidence metadata.
-- [ ] Add manual homography calibration loader.
+- [x] Add manual pitch calibration metadata.
 - [ ] Convert pixel detections to pitch-space positions.
 - [ ] Write detections, tracks, ball state, and player state to table files.
 
 ## Phase 6 — CV feature generation
 
-- [ ] Implement nearest player to ball.
-- [ ] Implement players within 3m and 5m of ball.
+- [x] Implement nearest player to ball.
+- [x] Implement players within radius of ball.
 - [ ] Implement ball speed and acceleration.
 - [ ] Implement possession confidence.
 - [ ] Implement possession chain duration.
@@ -118,7 +118,7 @@
 ## Immediate next commits
 
 1. Add canonical schema objects.
-2. Add World Cup match metadata loader.
-3. Add clip alignment helpers.
+2. Add ball interpolation helpers.
+3. Add homography transform implementation.
 4. Add first real StatsBomb loader implementation.
 5. Add leakage-safe label builder.
