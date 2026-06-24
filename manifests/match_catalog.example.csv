@@ -1,0 +1,3 @@
+match_id,competition,season,match_date,stage,home_team,away_team,venue,home_score,away_score,status
+match_001,FIFA World Cup,example-season,2026-06-11,group,Team A,Team B,Example Stadium,,,scheduled
+match_002,FIFA World Cup,example-season,2026-06-12,group,Team C,Team D,Example Stadium,2,1,complete
