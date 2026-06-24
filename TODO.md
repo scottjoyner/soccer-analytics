@@ -25,13 +25,13 @@
 
 - [x] Implement table read/write helpers.
 - [x] Implement DuckDB query helper.
-- [ ] Define schemas for matches, events, detections, tracks, features, predictions, and evaluations.
-- [ ] Add schema validation tests.
+- [x] Define schemas for matches, events, frames, ball states, player states, features, and labels.
+- [x] Add basic schema tests.
 - [ ] Add optional Neo4j export path.
 
 ## Phase 3 — Open data ingestion
 
-- [ ] Implement StatsBomb loader.
+- [x] Implement first local StatsBomb JSON loader.
 - [ ] Implement Metrica loader.
 - [ ] Implement SoccerNet loader.
 - [x] Implement generic match catalog loader.
@@ -53,8 +53,9 @@
 - [x] Add example video manifest.
 - [x] Add detector interface and null detector.
 - [x] Add initial tracker interface.
-- [ ] Add ball interpolation with confidence metadata.
+- [x] Add ball interpolation with confidence metadata.
 - [x] Add manual pitch calibration metadata.
+- [x] Add homography transform implementation.
 - [ ] Convert pixel detections to pitch-space positions.
 - [ ] Write detections, tracks, ball state, and player state to table files.
 
@@ -75,9 +76,9 @@
 
 - [ ] Build prematch feature table.
 - [ ] Build in-play rolling-window feature table.
-- [ ] Build label generation with leakage prevention.
+- [x] Add leakage-safe label helper.
 - [ ] Add time-based train/validation/test split.
-- [ ] Add synthetic fixtures to test label leakage.
+- [x] Add synthetic tests for label leakage.
 
 ## Phase 8 — Modeling
 
@@ -117,8 +118,8 @@
 
 ## Immediate next commits
 
-1. Add canonical schema objects.
-2. Add ball interpolation helpers.
-3. Add homography transform implementation.
-4. Add first real StatsBomb loader implementation.
-5. Add leakage-safe label builder.
+1. Convert detections and tracks into pitch-space state rows.
+2. Add ball speed and acceleration features.
+3. Add possession confidence and chain-duration features.
+4. Write CV outputs to table files from the video batch planner.
+5. Add first baseline training table builder.
