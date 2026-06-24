@@ -11,6 +11,7 @@
 - [x] Add safe environment template.
 - [x] Add git ignore rules.
 - [x] Add data pipeline design.
+- [x] Add predictive model engine design.
 
 ## Phase 1 — Project foundation
 
@@ -63,6 +64,7 @@
 
 - [x] Implement nearest player to ball.
 - [x] Implement players within radius of ball.
+- [x] Add occupancy-grid tensor builder for CNN inputs.
 - [ ] Implement ball speed and acceleration.
 - [ ] Implement possession confidence.
 - [ ] Implement possession chain duration.
@@ -82,9 +84,14 @@
 
 ## Phase 8 — Modeling
 
-- [ ] Train baseline model.
-- [ ] Train Elo/logistic baseline.
-- [ ] Train LightGBM or XGBoost tabular model.
+- [x] Add optional ML requirements file.
+- [x] Add game-state feature and training config objects.
+- [x] Add CNN model shell for field-state grids.
+- [x] Add temporal model spec for recurrent-style sequence models.
+- [ ] Add hybrid CNN plus temporal model implementation.
+- [ ] Add Torch dataset for rolling game-state samples.
+- [ ] Add CNN training loop.
+- [ ] Add temporal training loop.
 - [ ] Add calibration wrapper.
 - [ ] Report log loss, Brier score, and calibration curves.
 - [ ] Save feature list, model artifact, metrics, and version metadata.
@@ -97,29 +104,10 @@
 - [ ] Add report writer.
 - [ ] Add notebook for calibration review.
 
-## Phase 10 — Interface and operations
-
-- [ ] Add FastAPI service for predictions.
-- [ ] Add local dashboard.
-- [ ] Add model registry metadata.
-- [ ] Add experiment tracking.
-- [ ] Add runtime documentation.
-- [ ] Add Docker profile for optional services.
-
-## Phase 11 — Hardening
-
-- [ ] Add robust tests for every feature builder.
-- [ ] Add data validation reports.
-- [ ] Add drift monitoring.
-- [ ] Add duplicate match/video detection.
-- [ ] Add reproducible seed control.
-- [ ] Add model card template.
-- [ ] Add safety checklist for future integrations.
-
 ## Immediate next commits
 
 1. Convert detections and tracks into pitch-space state rows.
 2. Add ball speed and acceleration features.
 3. Add possession confidence and chain-duration features.
-4. Write CV outputs to table files from the video batch planner.
-5. Add first baseline training table builder.
+4. Add Torch dataset for rolling game-state samples.
+5. Add first CNN training loop.
