@@ -1,0 +1,3 @@
+video_id,match_id,competition,season,home_team,away_team,clip_type,source_url,local_path,period,start_match_second,end_match_second,rights_status,notes
+wc_example_full_match,wc_match_001,FIFA World Cup,example-season,Team A,Team B,full_match,https://example.com/source,data/raw/video_licensed/world_cup/full_matches/wc_example_full_match.mp4,full,0,5400,pending,Replace with approved local file before processing
+wc_example_goal_montage,wc_match_001,FIFA World Cup,example-season,Team A,Team B,goal_montage,https://example.com/source,data/raw/video_licensed/world_cup/goal_montages/wc_example_goal_montage.mp4,unknown,,,pending,Goal montage rows need segment alignment before supervised training
