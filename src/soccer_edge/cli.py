@@ -10,6 +10,7 @@ from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_inge
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.video.batch_runner import build_processing_plan
 
 app = typer.Typer(help="Soccer analytics research CLI.")
 ingest_app = typer.Typer(help="Ingest open soccer datasets.")
@@ -69,6 +70,17 @@ def discover_video(
 
     candidate = build_candidate(url=url, title=title, query=query)
     console.print(candidate)
+
+
+@video_app.command("plan")
+def plan_video_processing(
+    manifest: Path = typer.Option(..., exists=True),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed")),
+) -> None:
+    """Plan processable local video rows from a manifest."""
+
+    plan = build_processing_plan(manifest, licensed_root)
+    console.print(f"processable={len(plan.processable)} skipped={len(plan.skipped)}")
 
 
 @video_app.command("process")
