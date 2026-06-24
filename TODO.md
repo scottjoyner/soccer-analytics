@@ -13,16 +13,16 @@
 
 ## Phase 1 — Project foundation
 
-- [ ] Finalize package name and CLI entry point.
-- [ ] Add configuration loader.
+- [x] Finalize package name and CLI entry point.
+- [x] Add configuration loader.
 - [ ] Add structured logging.
-- [ ] Add linting and test tooling.
-- [ ] Add CLI smoke tests.
-- [ ] Add CI workflow.
+- [x] Add linting and test tooling.
+- [x] Add CLI smoke tests.
+- [x] Add CI workflow.
 
 ## Phase 2 — Storage layer
 
-- [ ] Implement Parquet read/write helpers.
+- [x] Implement table read/write helpers.
 - [ ] Implement DuckDB query helper.
 - [ ] Define schemas for matches, events, detections, tracks, features, predictions, and evaluations.
 - [ ] Add schema validation tests.
@@ -34,16 +34,16 @@
 - [ ] Implement Metrica loader.
 - [ ] Implement SoccerNet loader.
 - [ ] Implement fixture/result loader.
-- [ ] Normalize coordinates to 105m x 68m where possible.
+- [x] Add coordinate normalization utility for 105m x 68m pitch.
 - [ ] Preserve original coordinates alongside normalized coordinates.
 - [ ] Add data lineage columns to each output table.
 
 ## Phase 4 — Video discovery metadata
 
-- [ ] Implement video discovery metadata schema.
-- [ ] Store only title, URL, channel, date, search query, notes, and rights status.
-- [ ] Add tests proving no audiovisual download helper exists.
-- [ ] Add rights statuses: pending, licensed, rejected, owned, compatible_license.
+- [x] Implement video discovery metadata schema.
+- [x] Store only title, URL, channel, date, search query, notes, and rights status.
+- [x] Add tests proving no audiovisual download helper exists.
+- [x] Add default rights status: pending.
 - [ ] Allow video processing only from local licensed folders.
 
 ## Phase 5 — Licensed video processing
@@ -54,7 +54,7 @@
 - [ ] Add ball interpolation with confidence metadata.
 - [ ] Add manual homography calibration loader.
 - [ ] Convert pixel detections to pitch-space positions.
-- [ ] Write detections, tracks, ball state, and player state to Parquet.
+- [ ] Write detections, tracks, ball state, and player state to table files.
 
 ## Phase 6 — CV feature generation
 
@@ -112,3 +112,11 @@
 - [ ] Add reproducible seed control.
 - [ ] Add model card template.
 - [ ] Add safety checklist for future integrations.
+
+## Immediate next commits
+
+1. Add DuckDB query helper.
+2. Add canonical schema objects.
+3. Add licensed-folder guard for video processing.
+4. Add first real StatsBomb loader implementation.
+5. Add leakage-safe label builder.
