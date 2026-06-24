@@ -10,6 +10,7 @@
 - [x] Add Python package scaffold.
 - [x] Add safe environment template.
 - [x] Add git ignore rules.
+- [x] Add data pipeline design.
 
 ## Phase 1 — Project foundation
 
@@ -23,7 +24,7 @@
 ## Phase 2 — Storage layer
 
 - [x] Implement table read/write helpers.
-- [ ] Implement DuckDB query helper.
+- [x] Implement DuckDB query helper.
 - [ ] Define schemas for matches, events, detections, tracks, features, predictions, and evaluations.
 - [ ] Add schema validation tests.
 - [ ] Add optional Neo4j export path.
@@ -44,11 +45,12 @@
 - [x] Store only title, URL, channel, date, search query, notes, and rights status.
 - [x] Add tests proving no audiovisual download helper exists.
 - [x] Add default rights status: pending.
-- [ ] Allow video processing only from local licensed folders.
+- [x] Allow video processing only from local licensed folders.
 
 ## Phase 5 — Licensed video processing
 
-- [ ] Implement batch runner for local licensed videos.
+- [x] Implement batch planner for local licensed videos.
+- [x] Add example video manifest.
 - [ ] Implement YOLO detector wrapper.
 - [ ] Implement tracker wrapper.
 - [ ] Add ball interpolation with confidence metadata.
@@ -115,8 +117,8 @@
 
 ## Immediate next commits
 
-1. Add DuckDB query helper.
-2. Add canonical schema objects.
-3. Add licensed-folder guard for video processing.
+1. Add canonical schema objects.
+2. Add World Cup match metadata loader.
+3. Add clip alignment helpers.
 4. Add first real StatsBomb loader implementation.
 5. Add leakage-safe label builder.
