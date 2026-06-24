@@ -6,6 +6,10 @@ import typer
 from rich.console import Console
 
 from soccer_edge.config import get_settings
+from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
+from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
+from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
+from soccer_edge.ingest.video_discovery import build_candidate
 
 app = typer.Typer(help="Soccer analytics research CLI.")
 ingest_app = typer.Typer(help="Ingest open soccer datasets.")
@@ -31,34 +35,40 @@ def doctor() -> None:
     console.print("Soccer analytics environment", style="bold")
     console.print(f"env={settings.env}")
     console.print(f"data_dir={settings.data_dir}")
+    console.print(f"external_execution_enabled={settings.external_execution_enabled}")
 
 
 @ingest_app.command("statsbomb")
 def ingest_statsbomb(path: Path = typer.Option(..., exists=False)) -> None:
-    """Placeholder for StatsBomb ingest."""
+    """Prepare StatsBomb ingest."""
 
-    console.print(f"StatsBomb ingest placeholder: {path}")
+    console.print(run_statsbomb_ingest(path))
 
 
 @ingest_app.command("metrica")
 def ingest_metrica(path: Path = typer.Option(..., exists=False)) -> None:
-    """Placeholder for Metrica ingest."""
+    """Prepare Metrica ingest."""
 
-    console.print(f"Metrica ingest placeholder: {path}")
+    console.print(run_metrica_ingest(path))
 
 
 @ingest_app.command("soccernet")
 def ingest_soccernet(path: Path = typer.Option(..., exists=False)) -> None:
-    """Placeholder for SoccerNet ingest."""
+    """Prepare SoccerNet ingest."""
 
-    console.print(f"SoccerNet ingest placeholder: {path}")
+    console.print(run_soccernet_ingest(path))
 
 
 @discover_app.command("video")
-def discover_video(query: str = typer.Option(...)) -> None:
+def discover_video(
+    query: str = typer.Option(...),
+    url: str = typer.Option("https://example.com/manual-review"),
+    title: str = typer.Option("Manual review candidate"),
+) -> None:
     """Store candidate video metadata only."""
 
-    console.print(f"Video discovery metadata placeholder: {query}")
+    candidate = build_candidate(url=url, title=title, query=query)
+    console.print(candidate)
 
 
 @video_app.command("process")
