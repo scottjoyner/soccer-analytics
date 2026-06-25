@@ -57,7 +57,7 @@
 - [x] Add ball interpolation with confidence metadata.
 - [x] Add manual pitch calibration metadata.
 - [x] Add homography transform implementation.
-- [ ] Convert pixel detections to pitch-space positions.
+- [x] Convert pixel detections to pitch-space positions.
 - [ ] Write detections, tracks, ball state, and player state to table files.
 
 ## Phase 6 — CV feature generation
@@ -65,9 +65,9 @@
 - [x] Implement nearest player to ball.
 - [x] Implement players within radius of ball.
 - [x] Add occupancy-grid tensor builder for CNN inputs.
-- [ ] Implement ball speed and acceleration.
-- [ ] Implement possession confidence.
-- [ ] Implement possession chain duration.
+- [x] Implement ball speed and acceleration.
+- [x] Implement possession confidence.
+- [x] Implement possession chain duration.
 - [ ] Implement pressure score.
 - [ ] Implement team compactness.
 - [ ] Implement defensive and attacking line height.
@@ -89,8 +89,8 @@
 - [x] Add CNN model shell for field-state grids.
 - [x] Add temporal model spec for recurrent-style sequence models.
 - [ ] Add hybrid CNN plus temporal model implementation.
-- [ ] Add Torch dataset for rolling game-state samples.
-- [ ] Add CNN training loop.
+- [x] Add Torch dataset for rolling game-state samples.
+- [x] Add CNN training loop.
 - [ ] Add temporal training loop.
 - [ ] Add calibration wrapper.
 - [ ] Report log loss, Brier score, and calibration curves.
@@ -106,8 +106,8 @@
 
 ## Immediate next commits
 
-1. Convert detections and tracks into pitch-space state rows.
-2. Add ball speed and acceleration features.
-3. Add possession confidence and chain-duration features.
-4. Add Torch dataset for rolling game-state samples.
-5. Add first CNN training loop.
+1. Write detections, tracks, ball state, and player state to table files.
+2. Add pressure score and compactness features.
+3. Add hybrid CNN plus temporal model implementation.
+4. Add temporal training loop.
+5. Add calibration wrapper and metrics reporting.
