@@ -17,7 +17,7 @@
 
 - [x] Finalize package name and CLI entry point.
 - [x] Add configuration loader.
-- [ ] Add structured logging.
+- [x] Add structured logging.
 - [x] Add linting and test tooling.
 - [x] Add CLI smoke tests.
 - [x] Add CI workflow.
@@ -28,7 +28,7 @@
 - [x] Implement DuckDB query helper.
 - [x] Define schemas for matches, events, frames, ball states, player states, features, and labels.
 - [x] Add basic schema tests.
-- [ ] Add optional Neo4j export path.
+- [x] Add graph export payload path for match, frame, feature, and model-run metadata.
 
 ## Phase 3 — Open data ingestion
 
@@ -100,8 +100,8 @@
 
 - [x] Implement historical replay evaluator.
 - [x] Score predictions by confidence bucket.
-- [ ] Score predictions by league, team, and time window.
-- [ ] Add report writer.
+- [x] Score predictions by league, team, and time window.
+- [x] Add report writer.
 - [ ] Add notebook for calibration review.
 
 ## Phase 10 — CLI workflows
@@ -109,11 +109,12 @@
 - [x] Add feature build command.
 - [x] Add model bundle save command.
 - [x] Add model evaluate command.
+- [x] Add end-to-end sample workflow fixture.
 
 ## Immediate next commits
 
-1. Add league/team/time-window grouped replay scoring.
-2. Add report writer for metrics, calibration, and replay outputs.
-3. Add end-to-end sample data fixture that exercises feature build -> bundle save -> evaluate.
-4. Add Neo4j export path for match, frame, feature, and model-run metadata.
-5. Add structured logging.
+1. Implement Metrica loader.
+2. Implement SoccerNet loader.
+3. Add data lineage columns to output tables.
+4. Build prematch and in-play rolling-window feature tables.
+5. Add calibration review notebook or script.
