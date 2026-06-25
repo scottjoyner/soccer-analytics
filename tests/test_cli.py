@@ -17,6 +17,20 @@ def test_ingest_statsbomb_command() -> None:
     assert "loaded" in result.stdout
 
 
+def test_ingest_metrica_command(tmp_path) -> None:
+    (tmp_path / "RawEvents.csv").write_text("event_id,type\n1,pass\n", encoding="utf-8")
+    result = runner.invoke(app, ["ingest", "metrica", "--path", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "loaded" in result.stdout
+
+
+def test_ingest_soccernet_command(tmp_path) -> None:
+    (tmp_path / "labels.json").write_text('[{"label": "pass"}]', encoding="utf-8")
+    result = runner.invoke(app, ["ingest", "soccernet", "--path", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "loaded" in result.stdout
+
+
 def test_video_plan_command(tmp_path) -> None:
     licensed_root = tmp_path / "licensed"
     licensed_root.mkdir()
@@ -44,6 +58,27 @@ def test_features_build_command(tmp_path) -> None:
     assert (output_dir / "ball_states.parquet").exists()
 
 
+def test_features_prematch_command(tmp_path) -> None:
+    matches = tmp_path / "matches.csv"
+    output = tmp_path / "prematch.parquet"
+    matches.write_text("match_id,home_team,away_team\nm1,A,B\n", encoding="utf-8")
+    result = runner.invoke(app, ["features", "prematch", "--matches", str(matches), "--output", str(output)])
+    assert result.exit_code == 0
+    assert output.exists()
+
+
+def test_features_inplay_command(tmp_path) -> None:
+    source = tmp_path / "inplay.csv"
+    output = tmp_path / "inplay.parquet"
+    source.write_text("match_id,timestamp_seconds,speed\nm1,1.0,1.0\nm1,2.0,3.0\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["features", "inplay", "--source", str(source), "--output", str(output), "--columns", "speed"],
+    )
+    assert result.exit_code == 0
+    assert output.exists()
+
+
 def test_model_save_demo_command(tmp_path) -> None:
     output_dir = tmp_path / "bundle"
     result = runner.invoke(app, ["model", "save-demo", "--output-dir", str(output_dir)])
@@ -62,3 +97,16 @@ def test_model_evaluate_command(tmp_path) -> None:
     result = runner.invoke(app, ["model", "evaluate", "--predictions", str(predictions)])
     assert result.exit_code == 0
     assert "row_count=1" in result.stdout
+
+
+def test_model_calibration_review_command(tmp_path) -> None:
+    predictions = tmp_path / "predictions.csv"
+    output_dir = tmp_path / "calibration"
+    predictions.write_text("label,prob_0,prob_1,prob_2\n0,0.8,0.1,0.1\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["model", "calibration-review", "--predictions", str(predictions), "--output-dir", str(output_dir)],
+    )
+    assert result.exit_code == 0
+    assert (output_dir / "metrics.json").exists()
+    assert (output_dir / "calibration.json").exists()
