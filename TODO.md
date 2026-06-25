@@ -68,7 +68,7 @@
 - [x] Implement ball speed and acceleration.
 - [x] Implement possession confidence.
 - [x] Implement possession chain duration.
-- [ ] Implement pressure score.
+- [x] Implement pressure score.
 - [ ] Implement team compactness.
 - [ ] Implement defensive and attacking line height.
 - [ ] Implement final-third and box entries.
@@ -107,7 +107,7 @@
 ## Immediate next commits
 
 1. Write detections, tracks, ball state, and player state to table files.
-2. Add pressure score and compactness features.
+2. Add team compactness and line-height features.
 3. Add hybrid CNN plus temporal model implementation.
 4. Add temporal training loop.
 5. Add calibration wrapper and metrics reporting.
