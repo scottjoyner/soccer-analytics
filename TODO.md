@@ -33,12 +33,12 @@
 ## Phase 3 — Open data ingestion
 
 - [x] Implement first local StatsBomb JSON loader.
-- [ ] Implement Metrica loader.
-- [ ] Implement SoccerNet loader.
+- [x] Implement Metrica loader.
+- [x] Implement SoccerNet loader.
 - [x] Implement generic match catalog loader.
 - [x] Add coordinate normalization utility for 105m x 68m pitch.
 - [ ] Preserve original coordinates alongside normalized coordinates.
-- [ ] Add data lineage columns to each output table.
+- [x] Add data lineage columns to output tables.
 
 ## Phase 4 — Video discovery metadata
 
@@ -76,8 +76,8 @@
 
 ## Phase 7 — Supervised feature tables
 
-- [ ] Build prematch feature table.
-- [ ] Build in-play rolling-window feature table.
+- [x] Build prematch feature table.
+- [x] Build in-play rolling-window feature table.
 - [x] Add leakage-safe label helper.
 - [ ] Add time-based train/validation/test split.
 - [x] Add synthetic tests for label leakage.
@@ -102,19 +102,22 @@
 - [x] Score predictions by confidence bucket.
 - [x] Score predictions by league, team, and time window.
 - [x] Add report writer.
-- [ ] Add notebook for calibration review.
+- [x] Add calibration review script.
 
 ## Phase 10 — CLI workflows
 
 - [x] Add feature build command.
+- [x] Add prematch feature command.
+- [x] Add in-play feature command.
 - [x] Add model bundle save command.
 - [x] Add model evaluate command.
+- [x] Add model calibration review command.
 - [x] Add end-to-end sample workflow fixture.
 
 ## Immediate next commits
 
-1. Implement Metrica loader.
-2. Implement SoccerNet loader.
-3. Add data lineage columns to output tables.
-4. Build prematch and in-play rolling-window feature tables.
-5. Add calibration review notebook or script.
+1. Preserve original coordinates alongside normalized coordinates.
+2. Add time-based train/validation/test split.
+3. Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
+4. Add model registry index for saved bundles.
+5. Replace placeholder video process command with the first local frame/detection pipeline stub.
