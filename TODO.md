@@ -71,8 +71,8 @@
 - [x] Implement pressure score.
 - [x] Implement team compactness.
 - [x] Implement defensive and attacking line height.
-- [ ] Implement final-third and box entries.
-- [ ] Implement distance to goal and defenders between ball and goal.
+- [x] Implement final-third and box entries.
+- [x] Implement distance to goal and players between ball and goal.
 
 ## Phase 7 — Supervised feature tables
 
@@ -94,20 +94,26 @@
 - [x] Add temporal training loop.
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
-- [ ] Save feature list, model artifact, metrics, and version metadata.
+- [x] Save feature list, model artifact, metrics, and version metadata.
 
 ## Phase 9 — Offline evaluation
 
-- [ ] Implement historical replay evaluator.
-- [ ] Score predictions by confidence bucket.
+- [x] Implement historical replay evaluator.
+- [x] Score predictions by confidence bucket.
 - [ ] Score predictions by league, team, and time window.
 - [ ] Add report writer.
 - [ ] Add notebook for calibration review.
 
+## Phase 10 — CLI workflows
+
+- [x] Add feature build command.
+- [x] Add model bundle save command.
+- [x] Add model evaluate command.
+
 ## Immediate next commits
 
-1. Add final-third and box-entry features.
-2. Add distance-to-goal and defenders-between-ball-and-goal features.
-3. Save model artifact and metrics metadata.
-4. Add historical replay evaluator.
-5. Add CLI commands for feature build, model train, and model evaluate.
+1. Add league/team/time-window grouped replay scoring.
+2. Add report writer for metrics, calibration, and replay outputs.
+3. Add end-to-end sample data fixture that exercises feature build -> bundle save -> evaluate.
+4. Add Neo4j export path for match, frame, feature, and model-run metadata.
+5. Add structured logging.
