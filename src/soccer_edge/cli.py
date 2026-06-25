@@ -6,6 +6,7 @@ import pandas as pd
 import typer
 from rich.console import Console
 
+from soccer_edge.app_logging import configure_logging, get_logger
 from soccer_edge.config import get_settings
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
@@ -32,6 +33,15 @@ app.add_typer(train_app, name="train")
 app.add_typer(model_app, name="model")
 
 console = Console()
+logger = get_logger("soccer_edge.cli")
+
+
+@app.callback()
+def main(json_logs: bool = typer.Option(False, help="Emit structured JSON logs.")) -> None:
+    """Configure global CLI options."""
+
+    configure_logging(json_logs=json_logs)
+    logger.debug("cli configured")
 
 
 @app.command()
