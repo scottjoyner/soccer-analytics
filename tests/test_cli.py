@@ -14,7 +14,7 @@ def test_doctor_command() -> None:
 def test_ingest_statsbomb_command() -> None:
     result = runner.invoke(app, ["ingest", "statsbomb", "--path", "data/raw/statsbomb"])
     assert result.exit_code == 0
-    assert "StatsBomb" in result.stdout
+    assert "loaded" in result.stdout
 
 
 def test_video_plan_command(tmp_path) -> None:
@@ -35,3 +35,30 @@ def test_video_plan_command(tmp_path) -> None:
     )
     assert result.exit_code == 0
     assert "processable=1" in result.stdout
+
+
+def test_features_build_command(tmp_path) -> None:
+    output_dir = tmp_path / "state_tables"
+    result = runner.invoke(app, ["features", "build", "--output-dir", str(output_dir)])
+    assert result.exit_code == 0
+    assert (output_dir / "ball_states.parquet").exists()
+
+
+def test_model_save_demo_command(tmp_path) -> None:
+    output_dir = tmp_path / "bundle"
+    result = runner.invoke(app, ["model", "save-demo", "--output-dir", str(output_dir)])
+    assert result.exit_code == 0
+    assert (output_dir / "model.joblib").exists()
+    assert (output_dir / "metadata.json").exists()
+
+
+def test_model_evaluate_command(tmp_path) -> None:
+    predictions = tmp_path / "predictions.csv"
+    predictions.write_text(
+        "match_id,timestamp_seconds,label,prob_0,prob_1,prob_2\n"
+        "m1,1.0,0,0.8,0.1,0.1\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["model", "evaluate", "--predictions", str(predictions)])
+    assert result.exit_code == 0
+    assert "row_count=1" in result.stdout
