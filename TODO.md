@@ -58,7 +58,7 @@
 - [x] Add manual pitch calibration metadata.
 - [x] Add homography transform implementation.
 - [x] Convert pixel detections to pitch-space positions.
-- [ ] Write detections, tracks, ball state, and player state to table files.
+- [x] Write detections, tracks, ball state, and player state to table files.
 
 ## Phase 6 — CV feature generation
 
@@ -69,8 +69,8 @@
 - [x] Implement possession confidence.
 - [x] Implement possession chain duration.
 - [x] Implement pressure score.
-- [ ] Implement team compactness.
-- [ ] Implement defensive and attacking line height.
+- [x] Implement team compactness.
+- [x] Implement defensive and attacking line height.
 - [ ] Implement final-third and box entries.
 - [ ] Implement distance to goal and defenders between ball and goal.
 
@@ -88,12 +88,12 @@
 - [x] Add game-state feature and training config objects.
 - [x] Add CNN model shell for field-state grids.
 - [x] Add temporal model spec for recurrent-style sequence models.
-- [ ] Add hybrid CNN plus temporal model implementation.
+- [x] Add hybrid CNN plus temporal model implementation.
 - [x] Add Torch dataset for rolling game-state samples.
 - [x] Add CNN training loop.
-- [ ] Add temporal training loop.
-- [ ] Add calibration wrapper.
-- [ ] Report log loss, Brier score, and calibration curves.
+- [x] Add temporal training loop.
+- [x] Add calibration wrapper.
+- [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [ ] Save feature list, model artifact, metrics, and version metadata.
 
 ## Phase 9 — Offline evaluation
@@ -106,8 +106,8 @@
 
 ## Immediate next commits
 
-1. Write detections, tracks, ball state, and player state to table files.
-2. Add team compactness and line-height features.
-3. Add hybrid CNN plus temporal model implementation.
-4. Add temporal training loop.
-5. Add calibration wrapper and metrics reporting.
+1. Add final-third and box-entry features.
+2. Add distance-to-goal and defenders-between-ball-and-goal features.
+3. Save model artifact and metrics metadata.
+4. Add historical replay evaluator.
+5. Add CLI commands for feature build, model train, and model evaluate.
