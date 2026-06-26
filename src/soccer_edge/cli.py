@@ -6,7 +6,10 @@ import pandas as pd
 import typer
 from rich.console import Console
 
+from soccer_edge.active_sampling import write_low_confidence_rows
+from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
+from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
 from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
@@ -17,6 +20,7 @@ from soccer_edge.ingest.processed_tables import write_metrica_processed, write_s
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.local_training_chain import run_local_training_chain
 from soccer_edge.media_inference import make_media_callback
 from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.media_processing import run_media_processing_loop
@@ -181,6 +185,34 @@ def process_video_local_model(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@video_app.command("export-annotations")
+def export_annotations(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/annotations")),
+    classes: str = typer.Option("player,ball"),
+    image_width: float = typer.Option(1920.0),
+    image_height: float = typer.Option(1080.0),
+) -> None:
+    """Export normalized box annotations from detection rows."""
+
+    class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
+    paths = write_detection_annotations_from_table(source, output_dir, class_names, image_width, image_height)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@video_app.command("sample-low-confidence")
+def sample_low_confidence(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/low_confidence.csv")),
+    threshold: float = typer.Option(0.5),
+    limit: int | None = typer.Option(None),
+) -> None:
+    """Write low-confidence detection rows for review."""
+
+    path = write_low_confidence_rows(source, output, threshold=threshold, limit=limit)
+    console.print(f"wrote={path}")
+
+
 @features_app.command("build")
 def build_features(output_dir: Path = typer.Option(Path("data/processed/state_tables"))) -> None:
     """Create empty state-table files as the first feature-build target."""
@@ -284,6 +316,38 @@ def train_cnn(
         epochs=epochs,
         batch_size=batch_size,
         hidden_size=hidden_size,
+    )
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@train_app.command("local-chain")
+def train_local_chain(
+    footage_root: Path = typer.Option(..., exists=True),
+    tabular_source: Path = typer.Option(..., exists=True),
+    grid_source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/local_training_chain")),
+    tabular_columns: str = typer.Option(...),
+    grid_columns: str = typer.Option(...),
+    label: str = typer.Option("label"),
+    rights_status: str = typer.Option("owned"),
+    group: str | None = typer.Option("match_id"),
+    order: str | None = typer.Option(None),
+    detection_source: Path | None = typer.Option(None, exists=False),
+) -> None:
+    """Run the local chain from footage catalog through review artifacts."""
+
+    paths = run_local_training_chain(
+        footage_root=footage_root,
+        output_dir=output_dir,
+        tabular_source=tabular_source,
+        grid_source=grid_source,
+        tabular_columns=[column.strip() for column in tabular_columns.split(",") if column.strip()],
+        grid_columns=[column.strip() for column in grid_columns.split(",") if column.strip()],
+        label_column=label,
+        rights_status=rights_status,
+        group_column=group,
+        order_column=order,
+        detection_source=detection_source,
     )
     console.print({name: str(path) for name, path in paths.items()})
 
@@ -402,6 +466,31 @@ def model_run_summary(
 
     paths = write_run_summary(registry_path=registry, predictions_path=predictions, output_dir=output_dir, evaluation_path=evaluation)
     console.print({name: str(path) for name, path in paths.items()})
+
+
+@model_app.command("model-card")
+def model_card(
+    bundle_dir: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("MODEL_CARD.md")),
+) -> None:
+    """Write a model card for a saved bundle."""
+
+    path = write_model_card(bundle_dir, output)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("data-card")
+def data_card(
+    dataset_name: str = typer.Option(...),
+    sources: str = typer.Option(..., help="Comma-separated source paths."),
+    output: Path = typer.Option(Path("DATA_CARD.md")),
+    rights_status: str = typer.Option("owned"),
+) -> None:
+    """Write a data card for approved local/open sources."""
+
+    source_paths = [Path(source.strip()) for source in sources.split(",") if source.strip()]
+    path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status)
+    console.print(f"wrote={path}")
 
 
 @model_app.command("calibration-review-cnn")
