@@ -40,6 +40,7 @@
 - [x] Preserve original coordinates alongside normalized coordinates.
 - [x] Add data lineage columns to output tables.
 - [x] Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
+- [x] Add processed StatsBomb fixture coverage.
 
 ## Phase 4 — Video discovery metadata
 
@@ -61,6 +62,7 @@
 - [x] Convert pixel detections to pitch-space positions.
 - [x] Write detections, tracks, ball state, and player state to table files.
 - [x] Replace placeholder video process command with first local pipeline stub.
+- [ ] Replace NullDetector with an optional OpenCV frame sampler and detector adapter hook.
 
 ## Phase 6 — CV feature generation
 
@@ -80,6 +82,7 @@
 
 - [x] Build prematch feature table.
 - [x] Build in-play rolling-window feature table.
+- [x] Carry source metadata through rolling feature tables.
 - [x] Add leakage-safe label helper.
 - [x] Add time-based train/validation/test split.
 - [x] Add synthetic tests for label leakage.
@@ -94,10 +97,12 @@
 - [x] Add Torch dataset for rolling game-state samples.
 - [x] Add CNN training loop.
 - [x] Add temporal training loop.
+- [x] Add simple sklearn training helper and CLI command.
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [x] Save feature list, model artifact, metrics, and version metadata.
 - [x] Add model registry index for saved bundles.
+- [ ] Add full CNN training CLI command for tensor datasets.
 
 ## Phase 9 — Offline evaluation
 
@@ -113,16 +118,18 @@
 - [x] Add processed ingest command.
 - [x] Add prematch feature command.
 - [x] Add in-play feature command.
+- [x] Add simple training command.
 - [x] Add model bundle save command.
 - [x] Add model registry command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add end-to-end sample workflow fixture.
+- [x] Add local pipeline command docs.
 
 ## Immediate next commits
 
-1. Replace NullDetector with an optional OpenCV frame sampler and detector adapter hook.
-2. Add processed StatsBomb fixture coverage.
-3. Add feature-table lineage propagation.
-4. Add model training CLI commands for baseline and CNN paths.
-5. Add docs for the complete local pipeline commands.
+1. Add OpenCV frame sampler and detector adapter in a connector-safe patch.
+2. Add full CNN training CLI command for tensor datasets.
+3. Add prediction export command from saved model bundles.
+4. Add richer model registry summaries by metrics and created date.
+5. Add a CI workflow job that installs optional ML dependencies separately.
