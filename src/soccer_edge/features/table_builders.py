@@ -24,10 +24,12 @@ def build_inplay_rolling_table(
     window_seconds: float,
     group_column: str = "match_id",
     time_column: str = "timestamp_seconds",
+    carry_columns: list[str] | None = None,
 ) -> pd.DataFrame:
     if window_seconds <= 0:
         raise ValueError("window_seconds must be positive")
-    required = {group_column, time_column, *feature_columns}
+    carry_columns = [] if carry_columns is None else carry_columns
+    required = {group_column, time_column, *feature_columns, *carry_columns}
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"missing columns: {sorted(missing)}")
@@ -44,6 +46,8 @@ def build_inplay_rolling_table(
             & (ordered[time_column] > start_time)
         ]
         output_row: dict[str, object] = {group_column: group_value, time_column: current_time}
+        for column in carry_columns:
+            output_row[column] = row[column]
         for column in feature_columns:
             output_row[f"{column}_mean_{int(window_seconds)}s"] = float(window[column].mean())
             output_row[f"{column}_last"] = float(row[column])
