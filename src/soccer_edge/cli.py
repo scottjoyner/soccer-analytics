@@ -18,10 +18,13 @@ from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbom
 from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.models.bundle import save_bundle
+from soccer_edge.models.cnn_predict import export_cnn_bundle_predictions
 from soccer_edge.models.cnn_runner import train_cnn_from_npz
+from soccer_edge.models.comparison import write_model_comparison
 from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.registry import write_registry_index, write_registry_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
+from soccer_edge.models.tensor_samples import build_npz_from_table
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.state_tables import write_video_state_tables
 
@@ -178,6 +181,33 @@ def build_inplay_features(
     console.print(f"wrote={output} rows={len(table)}")
 
 
+@features_app.command("tensor-samples")
+def build_tensor_samples(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/tensor_samples.npz")),
+    columns: str = typer.Option(..., help="Comma-separated flattened spatial grid columns."),
+    label: str = typer.Option("label"),
+    sequence_length: int = typer.Option(1),
+    channels: int = typer.Option(3),
+    height: int = typer.Option(8),
+    width: int = typer.Option(8),
+) -> None:
+    """Build an NPZ tensor dataset for CNN training."""
+
+    spatial_columns = [column.strip() for column in columns.split(",") if column.strip()]
+    path = build_npz_from_table(
+        source=source,
+        output_path=output,
+        spatial_columns=spatial_columns,
+        label_column=label,
+        sequence_length=sequence_length,
+        channels=channels,
+        height=height,
+        width=width,
+    )
+    console.print(f"wrote={path}")
+
+
 @train_app.command("simple")
 def train_simple(
     source: Path = typer.Option(..., exists=True),
@@ -279,6 +309,31 @@ def model_predict(
 
     feature_columns = None if columns is None else [column.strip() for column in columns.split(",") if column.strip()]
     path = export_bundle_predictions(bundle_dir=bundle_dir, source=source, output=output, feature_columns=feature_columns)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("predict-cnn")
+def model_predict_cnn(
+    bundle_dir: Path = typer.Option(..., exists=True),
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/cnn_predictions.csv")),
+    batch_size: int = typer.Option(8),
+) -> None:
+    """Write CNN predictions from a saved tensor model bundle."""
+
+    path = export_cnn_bundle_predictions(bundle_dir=bundle_dir, npz_path=source, output=output, batch_size=batch_size)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("compare")
+def model_compare(
+    registry: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/model_comparison.csv")),
+    evaluation: Path | None = typer.Option(None, exists=False),
+) -> None:
+    """Write a model comparison report."""
+
+    path = write_model_comparison(registry_path=registry, output_path=output, evaluation_path=evaluation)
     console.print(f"wrote={path}")
 
 
