@@ -55,6 +55,8 @@ soccer-edge model registry-summary --root-dir data/processed/examples --output d
 soccer-edge model compare --registry data/processed/examples/registry_summary.csv --output data/processed/examples/comparison.csv
 soccer-edge model compare-markdown --comparison data/processed/examples/comparison.csv --output data/processed/examples/comparison.md
 soccer-edge model run-summary --registry data/processed/examples/registry_summary.csv --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/run_summary
+soccer-edge model model-card --bundle-dir data/processed/examples/simple_model --output data/processed/examples/MODEL_CARD.md
+soccer-edge model data-card --dataset-name local-example --sources examples/tiny_training.csv,examples/tiny_grid_features.csv --output data/processed/examples/DATA_CARD.md --rights-status owned
 soccer-edge model calibration-review --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/calibration_review
 ```
 
@@ -85,7 +87,27 @@ soccer-edge video process --input data/raw/video_licensed/clip.mp4 --output-dir 
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100
 ```
 
-6. When a local object model is configured, use the media reader and media inference adapter to convert per-frame outputs into table-ready rows.
+6. Export annotations and review low-confidence rows:
+
+```bash
+soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
+soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
+```
+
+## Local training chain
+
+The local chain is a first automation target for agents. It catalogs local footage, builds tensor samples, trains a simple model, exports predictions, writes run summaries, and creates model/data cards.
+
+```bash
+soccer-edge train local-chain \
+  --footage-root data/raw/video_licensed \
+  --tabular-source examples/tiny_training.csv \
+  --grid-source examples/tiny_grid_features.csv \
+  --output-dir data/processed/local_training_chain \
+  --tabular-columns speed_last,pressure_last \
+  --grid-columns g0,g1,g2,g3 \
+  --order timestamp_seconds
+```
 
 ## Fine-tuning pipeline target
 
@@ -96,16 +118,17 @@ The agent should prepare data for model fine-tuning in this order:
 3. Convert pixel-space detections to pitch-space state when calibration is available.
 4. Build rolling feature tables and preserve source metadata.
 5. Build tensor samples grouped by `match_id` and ordered by `timestamp_seconds` or `frame_idx`.
-6. Train baseline tabular models and CNN tensor models.
-7. Export predictions, calibration reports, registry summaries, and markdown comparison reports.
-8. Promote only model bundles with reproducible metadata, feature names, metrics, and lineage.
+6. Export normalized annotations and low-confidence review queues for local object-model improvement.
+7. Train baseline tabular models and CNN tensor models.
+8. Export predictions, calibration reports, registry summaries, cards, and markdown comparison reports.
+9. Promote only model bundles with reproducible metadata, feature names, metrics, and lineage.
 
 ## Suggested next implementation tasks
 
-1. Add calibration-aware pixel-to-pitch conversion into the media processing loop.
-2. Add an end-to-end fine-tuning command that runs ingest -> features -> tensor samples -> train -> predict -> review.
-3. Add active learning sampling for low-confidence frames.
-4. Add annotation export format for object model fine-tuning.
+1. Load homography calibration files from JSON/YAML in the media process command.
+2. Add object crop export for low-confidence review rows.
+3. Add model/data card validation checks in CI.
+4. Add a full object-model training command once the final annotation format and training backend are selected.
 5. Add richer examples for complete processed video and pitch-calibrated outputs.
 
 ## Quality gates
