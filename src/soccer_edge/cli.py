@@ -16,11 +16,11 @@ from soccer_edge.ingest.processed_tables import write_metrica_processed, write_s
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.registry import write_registry_index
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.video.batch_runner import build_processing_plan
-from soccer_edge.video.local_pipeline import run_local_video_pipeline
 from soccer_edge.video.state_tables import write_video_state_tables
 
 app = typer.Typer(help="Soccer analytics research CLI.")
@@ -133,7 +133,7 @@ def process_video(
 ) -> None:
     """Run the first local licensed video processing stub."""
 
-    result = run_local_video_pipeline(input_path=input_path, output_dir=output_dir, frame_count=frame_count)
+    result = run_media_table_stub(input_path=input_path, output_dir=output_dir, frame_count=frame_count)
     console.print(result)
 
 
