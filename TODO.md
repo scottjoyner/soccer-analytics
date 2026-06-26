@@ -37,8 +37,9 @@
 - [x] Implement SoccerNet loader.
 - [x] Implement generic match catalog loader.
 - [x] Add coordinate normalization utility for 105m x 68m pitch.
-- [ ] Preserve original coordinates alongside normalized coordinates.
+- [x] Preserve original coordinates alongside normalized coordinates.
 - [x] Add data lineage columns to output tables.
+- [x] Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
 
 ## Phase 4 — Video discovery metadata
 
@@ -59,6 +60,7 @@
 - [x] Add homography transform implementation.
 - [x] Convert pixel detections to pitch-space positions.
 - [x] Write detections, tracks, ball state, and player state to table files.
+- [x] Replace placeholder video process command with first local pipeline stub.
 
 ## Phase 6 — CV feature generation
 
@@ -79,7 +81,7 @@
 - [x] Build prematch feature table.
 - [x] Build in-play rolling-window feature table.
 - [x] Add leakage-safe label helper.
-- [ ] Add time-based train/validation/test split.
+- [x] Add time-based train/validation/test split.
 - [x] Add synthetic tests for label leakage.
 
 ## Phase 8 — Modeling
@@ -95,6 +97,7 @@
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [x] Save feature list, model artifact, metrics, and version metadata.
+- [x] Add model registry index for saved bundles.
 
 ## Phase 9 — Offline evaluation
 
@@ -107,17 +110,19 @@
 ## Phase 10 — CLI workflows
 
 - [x] Add feature build command.
+- [x] Add processed ingest command.
 - [x] Add prematch feature command.
 - [x] Add in-play feature command.
 - [x] Add model bundle save command.
+- [x] Add model registry command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add end-to-end sample workflow fixture.
 
 ## Immediate next commits
 
-1. Preserve original coordinates alongside normalized coordinates.
-2. Add time-based train/validation/test split.
-3. Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
-4. Add model registry index for saved bundles.
-5. Replace placeholder video process command with the first local frame/detection pipeline stub.
+1. Replace NullDetector with an optional OpenCV frame sampler and detector adapter hook.
+2. Add processed StatsBomb fixture coverage.
+3. Add feature-table lineage propagation.
+4. Add model training CLI commands for baseline and CNN paths.
+5. Add docs for the complete local pipeline commands.
