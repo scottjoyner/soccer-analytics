@@ -17,7 +17,9 @@ from soccer_edge.ingest.processed_tables import write_metrica_processed, write_s
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.media_inference import make_media_callback
 from soccer_edge.media_pipeline import run_media_table_stub
+from soccer_edge.media_processing import run_media_processing_loop
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.cnn_predict import export_cnn_bundle_predictions
 from soccer_edge.models.cnn_review import write_cnn_calibration_review
@@ -29,6 +31,7 @@ from soccer_edge.models.registry import write_registry_index, write_registry_sum
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
+from soccer_edge.object_model import LocalObjectRunner
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.local_catalog import write_local_video_catalog
 from soccer_edge.video.state_tables import write_video_state_tables
@@ -162,6 +165,22 @@ def process_video(
     console.print(result)
 
 
+@video_app.command("process-local-model")
+def process_video_local_model(
+    input_path: Path = typer.Option(..., "--input", exists=True),
+    model_path: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/video_model")),
+    stride: int = typer.Option(1),
+    max_samples: int | None = typer.Option(None),
+) -> None:
+    """Run optional local object-model inference over approved local footage."""
+
+    runner = LocalObjectRunner(model_path)
+    callback = make_media_callback(runner)
+    paths = run_media_processing_loop(input_path=input_path, output_dir=output_dir, callback=callback, stride=stride, max_samples=max_samples)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
 @features_app.command("build")
 def build_features(output_dir: Path = typer.Option(Path("data/processed/state_tables"))) -> None:
     """Create empty state-table files as the first feature-build target."""
@@ -285,7 +304,7 @@ def train_inplay() -> None:
 
 @model_app.command("save-demo")
 def save_demo_model(output_dir: Path = typer.Option(Path("data/processed/model_demo"))) -> None:
-    """Save a small demo model bundle with metadata."""
+    """Save a small model bundle with metadata."""
 
     paths = save_bundle(
         model={"kind": "demo"},
