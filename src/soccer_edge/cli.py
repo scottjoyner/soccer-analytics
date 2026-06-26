@@ -18,6 +18,7 @@ from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbom
 from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.models.bundle import save_bundle
+from soccer_edge.models.cnn_runner import train_cnn_from_npz
 from soccer_edge.models.registry import write_registry_index
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.video.batch_runner import build_processing_plan
@@ -188,6 +189,28 @@ def train_simple(
     frame = pd.read_parquet(source) if source.suffix == ".parquet" else pd.read_csv(source)
     feature_columns = [column.strip() for column in columns.split(",") if column.strip()]
     paths = fit_simple_classifier(frame, feature_columns=feature_columns, label_column=label, output_dir=output_dir)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@train_app.command("cnn")
+def train_cnn(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/cnn_model")),
+    output_classes: int = typer.Option(3),
+    epochs: int = typer.Option(1),
+    batch_size: int = typer.Option(4),
+    hidden_size: int = typer.Option(128),
+) -> None:
+    """Fit a CNN from an NPZ tensor dataset."""
+
+    paths = train_cnn_from_npz(
+        source,
+        output_dir,
+        output_classes=output_classes,
+        epochs=epochs,
+        batch_size=batch_size,
+        hidden_size=hidden_size,
+    )
     console.print({name: str(path) for name, path in paths.items()})
 
 
