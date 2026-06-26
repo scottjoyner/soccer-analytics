@@ -64,6 +64,7 @@
 - [x] Replace placeholder video process command with first local pipeline stub.
 - [x] Add optional media reader dependency gate.
 - [x] Add frame sampling and adapter execution loop.
+- [x] Add media inference adapter implementation.
 
 ## Phase 6 — CV feature generation
 
@@ -88,6 +89,7 @@
 - [x] Add time-based train/validation/test split.
 - [x] Add synthetic tests for label leakage.
 - [x] Add tensor sample builder from rolling grid feature tables.
+- [x] Add tensor builder support for multi-match grouped sequences.
 
 ## Phase 8 — Modeling
 
@@ -103,6 +105,7 @@
 - [x] Add full CNN training CLI command for tensor datasets.
 - [x] Add prediction export command from saved model bundles.
 - [x] Add prediction export tests for CNN bundles when Torch is available.
+- [x] Add CNN probability calibration review path.
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [x] Save feature list, model artifact, metrics, and version metadata.
@@ -117,6 +120,7 @@
 - [x] Add report writer.
 - [x] Add calibration review script.
 - [x] Add model comparison report from registry summary and evaluation metrics.
+- [x] Add model comparison markdown report writer.
 
 ## Phase 10 — CLI workflows
 
@@ -133,16 +137,19 @@
 - [x] Add model registry command.
 - [x] Add model registry summary command.
 - [x] Add model compare command.
+- [x] Add model compare markdown command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
+- [x] Add CNN calibration review command.
 - [x] Add end-to-end sample workflow fixture.
+- [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
 - [x] Add local pipeline command docs.
 - [x] Add docs for NPZ tensor dataset format.
 
 ## Immediate next commits
 
-1. Add a true media-to-detection adapter implementation once a concrete local detector is selected.
-2. Add tensor builder support for multi-match grouped sequences.
-3. Add CNN probability calibration review path.
-4. Add model comparison markdown report writer.
-5. Add examples directory with tiny CSV/NPZ fixtures.
+1. Add real YOLO/Ultralytics adapter option behind optional dependency gates.
+2. Add grouped tensor samples with time ordering column support.
+3. Add richer example fixtures for processed StatsBomb/Metrica/SoccerNet paths.
+4. Add model report bundle that writes CSV, markdown, and calibration artifacts together.
+5. Add CLI command to run the full tiny example pipeline end to end.
