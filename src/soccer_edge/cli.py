@@ -12,11 +12,14 @@ from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
+from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.models.bundle import save_bundle
+from soccer_edge.models.registry import write_registry_index
 from soccer_edge.video.batch_runner import build_processing_plan
+from soccer_edge.video.local_pipeline import run_local_video_pipeline
 from soccer_edge.video.state_tables import write_video_state_tables
 
 app = typer.Typer(help="Soccer analytics research CLI.")
@@ -78,6 +81,26 @@ def ingest_soccernet(path: Path = typer.Option(..., exists=False)) -> None:
     console.print(run_soccernet_ingest(path))
 
 
+@ingest_app.command("write-processed")
+def ingest_write_processed(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/ingest")),
+    source_type: str = typer.Option(..., help="statsbomb, metrica, or soccernet"),
+    dataset_version: str = typer.Option("unknown"),
+) -> None:
+    """Write local source files into processed parquet tables with lineage."""
+
+    if source_type == "statsbomb":
+        paths = write_statsbomb_processed(source, output_dir, dataset_version)
+    elif source_type == "metrica":
+        paths = write_metrica_processed(source, output_dir, dataset_version)
+    elif source_type == "soccernet":
+        paths = write_soccernet_processed(source, output_dir, dataset_version)
+    else:
+        raise typer.BadParameter("source_type must be statsbomb, metrica, or soccernet")
+    console.print({name: str(path) for name, path in paths.items()})
+
+
 @discover_app.command("video")
 def discover_video(
     query: str = typer.Option(...),
@@ -102,10 +125,15 @@ def plan_video_processing(
 
 
 @video_app.command("process")
-def process_video(input_path: Path = typer.Option(..., "--input", exists=False)) -> None:
-    """Process local licensed video files."""
+def process_video(
+    input_path: Path = typer.Option(..., "--input", exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/video_pipeline")),
+    frame_count: int = typer.Option(0),
+) -> None:
+    """Run the first local licensed video processing stub."""
 
-    console.print(f"Licensed video processing placeholder: {input_path}")
+    result = run_local_video_pipeline(input_path=input_path, output_dir=output_dir, frame_count=frame_count)
+    console.print(result)
 
 
 @features_app.command("build")
@@ -175,6 +203,17 @@ def save_demo_model(output_dir: Path = typer.Option(Path("data/processed/model_d
         notes="Demo bundle for pipeline validation.",
     )
     console.print({name: str(path) for name, path in paths.items()})
+
+
+@model_app.command("registry")
+def model_registry(
+    root_dir: Path = typer.Option(Path("data/processed")),
+    output: Path = typer.Option(Path("data/processed/model_registry.csv")),
+) -> None:
+    """Build an index of saved model bundles."""
+
+    path = write_registry_index(root_dir, output)
+    console.print(f"wrote={path}")
 
 
 @model_app.command("evaluate")
