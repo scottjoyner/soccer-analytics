@@ -18,6 +18,7 @@ from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbom
 from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.registry import write_registry_index
+from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.local_pipeline import run_local_video_pipeline
 from soccer_edge.video.state_tables import write_video_state_tables
@@ -175,18 +176,33 @@ def build_inplay_features(
     console.print(f"wrote={output} rows={len(table)}")
 
 
+@train_app.command("simple")
+def train_simple(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/simple_model")),
+    columns: str = typer.Option(..., help="Comma-separated feature columns."),
+    label: str = typer.Option("label"),
+) -> None:
+    """Fit a simple sklearn classifier from a table."""
+
+    frame = pd.read_parquet(source) if source.suffix == ".parquet" else pd.read_csv(source)
+    feature_columns = [column.strip() for column in columns.split(",") if column.strip()]
+    paths = fit_simple_classifier(frame, feature_columns=feature_columns, label_column=label, output_dir=output_dir)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
 @train_app.command("prematch")
 def train_prematch() -> None:
     """Train prematch model placeholder."""
 
-    console.print("Prematch training placeholder")
+    console.print("Use: soccer-edge train simple --source <table> --columns <features> --label <label>")
 
 
 @train_app.command("inplay")
 def train_inplay() -> None:
     """Train in-play model placeholder."""
 
-    console.print("In-play training placeholder")
+    console.print("Use: soccer-edge train simple --source <table> --columns <features> --label <label>")
 
 
 @model_app.command("save-demo")
