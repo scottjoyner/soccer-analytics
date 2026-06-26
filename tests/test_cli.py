@@ -1,6 +1,9 @@
+import numpy as np
+import pytest
 from typer.testing import CliRunner
 
 from soccer_edge.cli import app
+from soccer_edge.models.torch_optional import torch
 
 runner = CliRunner()
 
@@ -109,6 +112,20 @@ def test_train_simple_command(tmp_path) -> None:
     assert result.exit_code == 0
     assert (output / "model.joblib").exists()
     assert (output / "metadata.json").exists()
+
+
+def test_train_cnn_command(tmp_path) -> None:
+    if torch is None:
+        pytest.skip("torch is optional")
+    source = tmp_path / "samples.npz"
+    output = tmp_path / "cnn_model"
+    np.savez(source, spatial=np.zeros((2, 1, 3, 8, 8), dtype=np.float32), labels=np.array([0, 1]))
+    result = runner.invoke(
+        app,
+        ["train", "cnn", "--source", str(source), "--output-dir", str(output), "--output-classes", "2", "--epochs", "1", "--batch-size", "1", "--hidden-size", "8"],
+    )
+    assert result.exit_code == 0
+    assert (output / "model.joblib").exists()
 
 
 def test_model_save_demo_and_registry_commands(tmp_path) -> None:
