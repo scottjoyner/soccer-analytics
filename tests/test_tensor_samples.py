@@ -46,6 +46,31 @@ def test_build_npz_tensor_samples_grouped(tmp_path) -> None:
     assert data["labels"].tolist() == [1, 1]
 
 
+def test_build_npz_tensor_samples_orders_within_group(tmp_path) -> None:
+    columns = ["g0"]
+    frame = pd.DataFrame(
+        [
+            {"match_id": "m1", "timestamp_seconds": 2.0, "g0": 2.0, "label": 2},
+            {"match_id": "m1", "timestamp_seconds": 1.0, "g0": 1.0, "label": 1},
+        ]
+    )
+    path = build_npz_tensor_samples(
+        frame,
+        spatial_columns=columns,
+        label_column="label",
+        output_path=tmp_path / "ordered.npz",
+        sequence_length=2,
+        channels=1,
+        height=1,
+        width=1,
+        group_column="match_id",
+        order_column="timestamp_seconds",
+    )
+    data = np.load(path)
+    assert data["spatial"].reshape(2).tolist() == [1.0, 2.0]
+    assert data["labels"].tolist() == [2]
+
+
 def test_build_npz_from_table(tmp_path) -> None:
     columns = [f"g{i}" for i in range(4)]
     source = tmp_path / "grid.csv"
