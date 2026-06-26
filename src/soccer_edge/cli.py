@@ -10,6 +10,7 @@ from soccer_edge.app_logging import configure_logging, get_logger
 from soccer_edge.config import get_settings
 from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
+from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
 from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
@@ -25,9 +26,11 @@ from soccer_edge.models.comparison import write_model_comparison
 from soccer_edge.models.markdown_report import write_model_markdown_report
 from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.registry import write_registry_index, write_registry_summary
+from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
 from soccer_edge.video.batch_runner import build_processing_plan
+from soccer_edge.video.local_catalog import write_local_video_catalog
 from soccer_edge.video.state_tables import write_video_state_tables
 
 app = typer.Typer(help="Soccer analytics research CLI.")
@@ -37,6 +40,7 @@ video_app = typer.Typer(help="Process licensed local soccer videos.")
 features_app = typer.Typer(help="Build model feature tables.")
 train_app = typer.Typer(help="Train probability models.")
 model_app = typer.Typer(help="Save, score, and inspect model outputs.")
+examples_app = typer.Typer(help="Run tiny local examples.")
 
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(discover_app, name="discover")
@@ -44,6 +48,7 @@ app.add_typer(video_app, name="video")
 app.add_typer(features_app, name="features")
 app.add_typer(train_app, name="train")
 app.add_typer(model_app, name="model")
+app.add_typer(examples_app, name="examples")
 
 console = Console()
 logger = get_logger("soccer_edge.cli")
@@ -121,6 +126,19 @@ def discover_video(
     console.print(candidate)
 
 
+@video_app.command("catalog-local")
+def catalog_local_video(
+    root: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("manifests/local_video_manifest.csv")),
+    rights_status: str = typer.Option("owned"),
+    clip_type: str = typer.Option("full_match"),
+) -> None:
+    """Catalog approved local footage into a manifest."""
+
+    path = write_local_video_catalog(root=root, output=output, rights_status=rights_status, clip_type=clip_type)
+    console.print(f"wrote={path}")
+
+
 @video_app.command("plan")
 def plan_video_processing(
     manifest: Path = typer.Option(..., exists=True),
@@ -194,6 +212,7 @@ def build_tensor_samples(
     height: int = typer.Option(8),
     width: int = typer.Option(8),
     group: str | None = typer.Option(None, help="Optional group column such as match_id."),
+    order: str | None = typer.Option(None, help="Optional ordering column such as timestamp_seconds."),
 ) -> None:
     """Build an NPZ tensor dataset for CNN training."""
 
@@ -208,6 +227,7 @@ def build_tensor_samples(
         height=height,
         width=width,
         group_column=group,
+        order_column=order,
     )
     console.print(f"wrote={path}")
 
@@ -352,6 +372,19 @@ def model_compare_markdown(
     console.print(f"wrote={path}")
 
 
+@model_app.command("run-summary")
+def model_run_summary(
+    registry: Path = typer.Option(..., exists=True),
+    predictions: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/run_summary")),
+    evaluation: Path | None = typer.Option(None, exists=False),
+) -> None:
+    """Write comparison, markdown, and calibration artifacts together."""
+
+    paths = write_run_summary(registry_path=registry, predictions_path=predictions, output_dir=output_dir, evaluation_path=evaluation)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
 @model_app.command("calibration-review-cnn")
 def calibration_review_cnn(
     bundle_dir: Path = typer.Option(..., exists=True),
@@ -385,6 +418,17 @@ def calibration_review(
 
     frame = pd.read_parquet(predictions) if predictions.suffix == ".parquet" else pd.read_csv(predictions)
     paths = write_calibration_review(frame, output_dir=output_dir, num_bins=num_bins)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@examples_app.command("tiny")
+def examples_tiny(
+    repo_root: Path = typer.Option(Path(".")),
+    output_dir: Path = typer.Option(Path("data/processed/examples/tiny_pipeline")),
+) -> None:
+    """Run the tiny local example pipeline end to end."""
+
+    paths = run_tiny_example_pipeline(repo_root=repo_root, output_dir=output_dir)
     console.print({name: str(path) for name, path in paths.items()})
 
 
