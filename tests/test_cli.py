@@ -31,6 +31,19 @@ def test_ingest_soccernet_command(tmp_path) -> None:
     assert "loaded" in result.stdout
 
 
+def test_ingest_write_processed_command(tmp_path) -> None:
+    source = tmp_path / "source"
+    output = tmp_path / "processed"
+    source.mkdir()
+    (source / "RawEvents.csv").write_text("event_id,type\n1,pass\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["ingest", "write-processed", "--source", str(source), "--output-dir", str(output), "--source-type", "metrica"],
+    )
+    assert result.exit_code == 0
+    assert (output / "metrica_events.parquet").exists()
+
+
 def test_video_plan_command(tmp_path) -> None:
     licensed_root = tmp_path / "licensed"
     licensed_root.mkdir()
@@ -49,6 +62,15 @@ def test_video_plan_command(tmp_path) -> None:
     )
     assert result.exit_code == 0
     assert "processable=1" in result.stdout
+
+
+def test_video_process_command(tmp_path) -> None:
+    clip = tmp_path / "clip.mp4"
+    output = tmp_path / "video_out"
+    clip.write_bytes(b"demo")
+    result = runner.invoke(app, ["video", "process", "--input", str(clip), "--output-dir", str(output), "--frame-count", "1"])
+    assert result.exit_code == 0
+    assert (output / "detections.parquet").exists()
 
 
 def test_features_build_command(tmp_path) -> None:
@@ -79,12 +101,15 @@ def test_features_inplay_command(tmp_path) -> None:
     assert output.exists()
 
 
-def test_model_save_demo_command(tmp_path) -> None:
+def test_model_save_demo_and_registry_commands(tmp_path) -> None:
     output_dir = tmp_path / "bundle"
     result = runner.invoke(app, ["model", "save-demo", "--output-dir", str(output_dir)])
     assert result.exit_code == 0
     assert (output_dir / "model.joblib").exists()
-    assert (output_dir / "metadata.json").exists()
+    registry = tmp_path / "registry.csv"
+    result = runner.invoke(app, ["model", "registry", "--root-dir", str(tmp_path), "--output", str(registry)])
+    assert result.exit_code == 0
+    assert registry.exists()
 
 
 def test_model_evaluate_command(tmp_path) -> None:
