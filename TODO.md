@@ -19,8 +19,8 @@
 - [x] Add configuration loader.
 - [x] Add structured logging.
 - [x] Add linting and test tooling.
-- [x] Add CLI smoke tests.
 - [x] Add CI workflow.
+- [x] Add optional ML CI workflow job.
 
 ## Phase 2 — Storage layer
 
@@ -62,7 +62,8 @@
 - [x] Convert pixel detections to pitch-space positions.
 - [x] Write detections, tracks, ball state, and player state to table files.
 - [x] Replace placeholder video process command with first local pipeline stub.
-- [ ] Replace NullDetector with an optional OpenCV frame sampler and detector adapter hook.
+- [x] Add optional media reader dependency gate.
+- [ ] Add frame sampling and adapter execution loop.
 
 ## Phase 6 — CV feature generation
 
@@ -98,11 +99,13 @@
 - [x] Add CNN training loop.
 - [x] Add temporal training loop.
 - [x] Add simple sklearn training helper and CLI command.
+- [x] Add full CNN training CLI command for tensor datasets.
+- [x] Add prediction export command from saved model bundles.
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [x] Save feature list, model artifact, metrics, and version metadata.
 - [x] Add model registry index for saved bundles.
-- [ ] Add full CNN training CLI command for tensor datasets.
+- [x] Add richer model registry summaries by metrics and created date.
 
 ## Phase 9 — Offline evaluation
 
@@ -119,8 +122,11 @@
 - [x] Add prematch feature command.
 - [x] Add in-play feature command.
 - [x] Add simple training command.
+- [x] Add CNN training command.
 - [x] Add model bundle save command.
+- [x] Add model prediction command.
 - [x] Add model registry command.
+- [x] Add model registry summary command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add end-to-end sample workflow fixture.
@@ -128,8 +134,8 @@
 
 ## Immediate next commits
 
-1. Add OpenCV frame sampler and detector adapter in a connector-safe patch.
-2. Add full CNN training CLI command for tensor datasets.
-3. Add prediction export command from saved model bundles.
-4. Add richer model registry summaries by metrics and created date.
-5. Add a CI workflow job that installs optional ML dependencies separately.
+1. Add frame sampling and adapter execution loop on top of the media reader gate.
+2. Add tensor sample builder from rolling grid feature tables.
+3. Add prediction export tests for CNN bundles when Torch is available.
+4. Add model comparison report from registry summary and evaluation metrics.
+5. Add docs for NPZ tensor dataset format.
