@@ -63,7 +63,7 @@
 - [x] Write detections, tracks, ball state, and player state to table files.
 - [x] Replace placeholder video process command with first local pipeline stub.
 - [x] Add optional media reader dependency gate.
-- [ ] Add frame sampling and adapter execution loop.
+- [x] Add frame sampling and adapter execution loop.
 
 ## Phase 6 — CV feature generation
 
@@ -87,6 +87,7 @@
 - [x] Add leakage-safe label helper.
 - [x] Add time-based train/validation/test split.
 - [x] Add synthetic tests for label leakage.
+- [x] Add tensor sample builder from rolling grid feature tables.
 
 ## Phase 8 — Modeling
 
@@ -101,6 +102,7 @@
 - [x] Add simple sklearn training helper and CLI command.
 - [x] Add full CNN training CLI command for tensor datasets.
 - [x] Add prediction export command from saved model bundles.
+- [x] Add prediction export tests for CNN bundles when Torch is available.
 - [x] Add calibration wrapper.
 - [x] Report log loss, Brier score, accuracy, and calibration curves.
 - [x] Save feature list, model artifact, metrics, and version metadata.
@@ -114,6 +116,7 @@
 - [x] Score predictions by league, team, and time window.
 - [x] Add report writer.
 - [x] Add calibration review script.
+- [x] Add model comparison report from registry summary and evaluation metrics.
 
 ## Phase 10 — CLI workflows
 
@@ -121,21 +124,25 @@
 - [x] Add processed ingest command.
 - [x] Add prematch feature command.
 - [x] Add in-play feature command.
+- [x] Add tensor sample command.
 - [x] Add simple training command.
 - [x] Add CNN training command.
 - [x] Add model bundle save command.
 - [x] Add model prediction command.
+- [x] Add CNN prediction command.
 - [x] Add model registry command.
 - [x] Add model registry summary command.
+- [x] Add model compare command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add local pipeline command docs.
+- [x] Add docs for NPZ tensor dataset format.
 
 ## Immediate next commits
 
-1. Add frame sampling and adapter execution loop on top of the media reader gate.
-2. Add tensor sample builder from rolling grid feature tables.
-3. Add prediction export tests for CNN bundles when Torch is available.
-4. Add model comparison report from registry summary and evaluation metrics.
-5. Add docs for NPZ tensor dataset format.
+1. Add a true media-to-detection adapter implementation once a concrete local detector is selected.
+2. Add tensor builder support for multi-match grouped sequences.
+3. Add CNN probability calibration review path.
+4. Add model comparison markdown report writer.
+5. Add examples directory with tiny CSV/NPZ fixtures.
