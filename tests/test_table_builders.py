@@ -23,6 +23,17 @@ def test_build_inplay_rolling_table() -> None:
     assert table.iloc[1]["speed_mean_2s"] == 2.0
 
 
+def test_build_inplay_rolling_table_carries_metadata() -> None:
+    frame = pd.DataFrame(
+        [
+            {"match_id": "m1", "timestamp_seconds": 1.0, "speed": 1.0, "source_name": "demo"},
+            {"match_id": "m1", "timestamp_seconds": 2.0, "speed": 3.0, "source_name": "demo"},
+        ]
+    )
+    table = build_inplay_rolling_table(frame, feature_columns=["speed"], window_seconds=2.0, carry_columns=["source_name"])
+    assert list(table["source_name"]) == ["demo", "demo"]
+
+
 def test_build_inplay_rolling_table_requires_positive_window() -> None:
     with pytest.raises(ValueError):
         build_inplay_rolling_table(pd.DataFrame(), feature_columns=[], window_seconds=0.0)
