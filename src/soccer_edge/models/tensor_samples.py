@@ -41,6 +41,14 @@ def append_sequence_rows(
         labels.append(int(label_values[end_idx]))
 
 
+def ordered_frame(frame: pd.DataFrame, order_column: str | None) -> pd.DataFrame:
+    if order_column is None:
+        return frame.reset_index(drop=True)
+    if order_column not in frame.columns:
+        raise ValueError(f"missing order column: {order_column}")
+    return frame.sort_values(order_column).reset_index(drop=True)
+
+
 def build_npz_tensor_samples(
     frame: pd.DataFrame,
     spatial_columns: list[str],
@@ -51,6 +59,7 @@ def build_npz_tensor_samples(
     height: int = 8,
     width: int = 8,
     group_column: str | None = None,
+    order_column: str | None = None,
 ) -> Path:
     if sequence_length <= 0:
         raise ValueError("sequence_length must be positive")
@@ -61,10 +70,10 @@ def build_npz_tensor_samples(
     samples: list[np.ndarray] = []
     labels: list[int] = []
     if group_column is None:
-        append_sequence_rows(frame, spatial_columns, label_column, sequence_length, channels, height, width, samples, labels)
+        append_sequence_rows(ordered_frame(frame, order_column), spatial_columns, label_column, sequence_length, channels, height, width, samples, labels)
     else:
         for _, group in frame.groupby(group_column, sort=False):
-            append_sequence_rows(group.reset_index(drop=True), spatial_columns, label_column, sequence_length, channels, height, width, samples, labels)
+            append_sequence_rows(ordered_frame(group, order_column), spatial_columns, label_column, sequence_length, channels, height, width, samples, labels)
     if not samples:
         raise ValueError("no tensor samples produced")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,6 +91,7 @@ def build_npz_from_table(
     height: int = 8,
     width: int = 8,
     group_column: str | None = None,
+    order_column: str | None = None,
 ) -> Path:
     frame = pd.read_parquet(source) if source.suffix == ".parquet" else pd.read_csv(source)
     return build_npz_tensor_samples(
@@ -94,4 +104,5 @@ def build_npz_from_table(
         height=height,
         width=width,
         group_column=group_column,
+        order_column=order_column,
     )
