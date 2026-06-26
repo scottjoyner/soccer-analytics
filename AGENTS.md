@@ -24,7 +24,7 @@ pip install -r requirements-dev.txt
 pip install -e .
 ```
 
-Optional ML stack:
+Optional ML and local object model stack:
 
 ```bash
 pip install -r requirements-ml.txt
@@ -42,7 +42,7 @@ Build model inputs:
 
 ```bash
 soccer-edge features inplay --source data/processed/game_state.csv --output data/processed/inplay_features.parquet --columns speed,pressure --window-seconds 60
-soccer-edge features tensor-samples --source examples/tiny_grid_features.csv --output data/processed/examples/tiny_tensor_samples.npz --columns g0,g1,g2,g3 --label label --channels 1 --height 2 --width 2 --sequence-length 2 --group match_id
+soccer-edge features tensor-samples --source examples/tiny_grid_features.csv --output data/processed/examples/tiny_tensor_samples.npz --columns g0,g1,g2,g3 --label label --channels 1 --height 2 --width 2 --sequence-length 2 --group match_id --order timestamp_seconds
 ```
 
 Train and review:
@@ -54,7 +54,14 @@ soccer-edge model registry --root-dir data/processed/examples --output data/proc
 soccer-edge model registry-summary --root-dir data/processed/examples --output data/processed/examples/registry_summary.csv
 soccer-edge model compare --registry data/processed/examples/registry_summary.csv --output data/processed/examples/comparison.csv
 soccer-edge model compare-markdown --comparison data/processed/examples/comparison.csv --output data/processed/examples/comparison.md
+soccer-edge model run-summary --registry data/processed/examples/registry_summary.csv --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/run_summary
 soccer-edge model calibration-review --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/calibration_review
+```
+
+Run the tiny local smoke pipeline:
+
+```bash
+soccer-edge examples tiny --repo-root . --output-dir data/processed/examples/tiny_pipeline
 ```
 
 ## Raw footage collection workflow
@@ -64,14 +71,21 @@ The agent may organize local footage, but must not fetch audiovisual files from 
 1. Search approved local roots provided by the user, such as `/mnt`, `/media`, `/data`, or Tailscale-mounted shares.
 2. Copy or reference only files that the user owns or has licensed for processing.
 3. Create or update a video manifest with columns: `video_id`, `match_id`, `clip_type`, `local_path`, `rights_status`, `notes`.
-4. Run:
+4. Catalog approved footage and plan processable rows:
 
 ```bash
-soccer-edge video plan --manifest manifests/video_manifest.example.csv --licensed-root data/raw/video_licensed
-soccer-edge video process --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/video_pipeline --frame-count 100
+soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned
+soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
 ```
 
-5. When a local object model is configured, use the media reader and media inference adapter to convert per-frame outputs into table-ready rows.
+5. Run the scaffold process command or the optional local object-model command:
+
+```bash
+soccer-edge video process --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/video_pipeline --frame-count 100
+soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100
+```
+
+6. When a local object model is configured, use the media reader and media inference adapter to convert per-frame outputs into table-ready rows.
 
 ## Fine-tuning pipeline target
 
@@ -88,11 +102,11 @@ The agent should prepare data for model fine-tuning in this order:
 
 ## Suggested next implementation tasks
 
-1. Add a concrete local object-model adapter behind optional dependency gates.
+1. Add calibration-aware pixel-to-pitch conversion into the media processing loop.
 2. Add an end-to-end fine-tuning command that runs ingest -> features -> tensor samples -> train -> predict -> review.
-3. Add manifest generation from approved local footage roots.
-4. Add calibration-aware pixel-to-pitch conversion into the media processing loop.
-5. Add richer examples for complete StatsBomb/Metrica/SoccerNet processed outputs.
+3. Add active learning sampling for low-confidence frames.
+4. Add annotation export format for object model fine-tuning.
+5. Add richer examples for complete processed video and pitch-calibrated outputs.
 
 ## Quality gates
 
