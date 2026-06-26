@@ -9,13 +9,16 @@ soccer-edge train simple --source data/processed/inplay_features.parquet --colum
 soccer-edge model predict --bundle-dir data/processed/simple_model --source data/processed/inplay_features.parquet --output data/processed/predictions.csv
 soccer-edge model registry --root-dir data/processed --output data/processed/model_registry.csv
 soccer-edge model registry-summary --root-dir data/processed --output data/processed/model_registry_summary.csv
+soccer-edge model compare --registry data/processed/model_registry_summary.csv --output data/processed/model_comparison.csv
 soccer-edge model calibration-review --predictions data/processed/predictions.csv --output-dir data/processed/calibration_review
 ```
 
-Optional CNN training uses an NPZ file with `spatial` and `labels` arrays.
+Optional CNN training uses an NPZ file with `spatial` and `labels` arrays. You can build the NPZ from flattened grid columns, then train and export CNN outputs.
 
 ```bash
+soccer-edge features tensor-samples --source data/processed/grid_features.csv --output data/processed/tensor_samples.npz --columns g0,g1,g2,g3 --label label --channels 1 --height 2 --width 2
 soccer-edge train cnn --source data/processed/tensor_samples.npz --output-dir data/processed/cnn_model --output-classes 3 --epochs 5 --batch-size 8
+soccer-edge model predict-cnn --bundle-dir data/processed/cnn_model --source data/processed/tensor_samples.npz --output data/processed/cnn_predictions.csv
 ```
 
-Local media processing remains restricted to files you have rights to process. The current command writes the state-table scaffold and is ready for a future sampler and adapter.
+Local media processing remains restricted to files you have rights to process. The media reader gate uses optional OpenCV support, while the default process command writes the state-table scaffold.
