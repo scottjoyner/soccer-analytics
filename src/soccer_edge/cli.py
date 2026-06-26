@@ -19,8 +19,10 @@ from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.cnn_predict import export_cnn_bundle_predictions
+from soccer_edge.models.cnn_review import write_cnn_calibration_review
 from soccer_edge.models.cnn_runner import train_cnn_from_npz
 from soccer_edge.models.comparison import write_model_comparison
+from soccer_edge.models.markdown_report import write_model_markdown_report
 from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.registry import write_registry_index, write_registry_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
@@ -191,6 +193,7 @@ def build_tensor_samples(
     channels: int = typer.Option(3),
     height: int = typer.Option(8),
     width: int = typer.Option(8),
+    group: str | None = typer.Option(None, help="Optional group column such as match_id."),
 ) -> None:
     """Build an NPZ tensor dataset for CNN training."""
 
@@ -204,6 +207,7 @@ def build_tensor_samples(
         channels=channels,
         height=height,
         width=width,
+        group_column=group,
     )
     console.print(f"wrote={path}")
 
@@ -335,6 +339,31 @@ def model_compare(
 
     path = write_model_comparison(registry_path=registry, output_path=output, evaluation_path=evaluation)
     console.print(f"wrote={path}")
+
+
+@model_app.command("compare-markdown")
+def model_compare_markdown(
+    comparison: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/model_comparison.md")),
+) -> None:
+    """Write a markdown model comparison report."""
+
+    path = write_model_markdown_report(comparison_path=comparison, output_path=output)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("calibration-review-cnn")
+def calibration_review_cnn(
+    bundle_dir: Path = typer.Option(..., exists=True),
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/cnn_calibration_review")),
+    batch_size: int = typer.Option(8),
+    num_bins: int = typer.Option(10),
+) -> None:
+    """Write CNN metrics and calibration artifacts from tensor samples."""
+
+    paths = write_cnn_calibration_review(bundle_dir, source, output_dir, batch_size=batch_size, num_bins=num_bins)
+    console.print({name: str(path) for name, path in paths.items()})
 
 
 @model_app.command("evaluate")
