@@ -101,6 +101,16 @@ def test_features_inplay_command(tmp_path) -> None:
     assert output.exists()
 
 
+def test_train_simple_command(tmp_path) -> None:
+    source = tmp_path / "training.csv"
+    output = tmp_path / "simple_model"
+    source.write_text("x,label\n0,0\n1,1\n2,1\n-1,0\n", encoding="utf-8")
+    result = runner.invoke(app, ["train", "simple", "--source", str(source), "--output-dir", str(output), "--columns", "x"])
+    assert result.exit_code == 0
+    assert (output / "model.joblib").exists()
+    assert (output / "metadata.json").exists()
+
+
 def test_model_save_demo_and_registry_commands(tmp_path) -> None:
     output_dir = tmp_path / "bundle"
     result = runner.invoke(app, ["model", "save-demo", "--output-dir", str(output_dir)])
