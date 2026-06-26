@@ -69,6 +69,9 @@
 - [x] Add media inference adapter implementation.
 - [x] Add optional local object model bridge.
 - [x] Add local footage catalog manifest command.
+- [x] Add calibration-aware pixel-to-pitch conversion into the media processing loop.
+- [x] Add annotation export format for local object model fine-tuning.
+- [x] Add active learning sampling for low-confidence frames.
 
 ## Phase 6 — CV feature generation
 
@@ -117,6 +120,7 @@
 - [x] Add model registry index for saved bundles.
 - [x] Add richer model registry summaries by metrics and created date.
 - [x] Add run summary writer for comparison, markdown, and calibration artifacts.
+- [x] Add model/data cards for promoted fine-tuned bundles.
 
 ## Phase 9 — Offline evaluation
 
@@ -137,6 +141,7 @@
 - [x] Add tensor sample command.
 - [x] Add simple training command.
 - [x] Add CNN training command.
+- [x] Add local training chain command.
 - [x] Add model bundle save command.
 - [x] Add model prediction command.
 - [x] Add CNN prediction command.
@@ -145,11 +150,13 @@
 - [x] Add model compare command.
 - [x] Add model compare markdown command.
 - [x] Add model run summary command.
+- [x] Add model/data card commands.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add CNN calibration review command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
+- [x] Add annotation export and low-confidence sampling commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
@@ -158,8 +165,8 @@
 
 ## Immediate next commits
 
-1. Add calibration-aware pixel-to-pitch conversion into the media processing loop.
-2. Add annotation export format for local object model fine-tuning.
-3. Add active learning sampling for low-confidence frames.
-4. Add end-to-end fine-tuning command that chains footage catalog -> object rows -> tensors -> train -> review.
-5. Add model/data cards for promoted fine-tuned bundles.
+1. Load homography calibration files from JSON/YAML in the media process command.
+2. Add object crop export for low-confidence review rows.
+3. Add model/data card validation checks in CI.
+4. Add a full object-model training command once the final annotation format and training backend are selected.
+5. Add richer examples for complete processed video and pitch-calibrated outputs.
