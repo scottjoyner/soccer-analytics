@@ -12,6 +12,7 @@
 - [x] Add git ignore rules.
 - [x] Add data pipeline design.
 - [x] Add predictive model engine design.
+- [x] Add AGENTS.md for agent operation.
 
 ## Phase 1 — Project foundation
 
@@ -41,6 +42,7 @@
 - [x] Add data lineage columns to output tables.
 - [x] Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
 - [x] Add processed StatsBomb fixture coverage.
+- [x] Add richer example fixtures for processed StatsBomb/Metrica/SoccerNet paths.
 
 ## Phase 4 — Video discovery metadata
 
@@ -65,6 +67,8 @@
 - [x] Add optional media reader dependency gate.
 - [x] Add frame sampling and adapter execution loop.
 - [x] Add media inference adapter implementation.
+- [x] Add optional local object model bridge.
+- [x] Add local footage catalog manifest command.
 
 ## Phase 6 — CV feature generation
 
@@ -90,6 +94,7 @@
 - [x] Add synthetic tests for label leakage.
 - [x] Add tensor sample builder from rolling grid feature tables.
 - [x] Add tensor builder support for multi-match grouped sequences.
+- [x] Add grouped tensor samples with time ordering column support.
 
 ## Phase 8 — Modeling
 
@@ -111,6 +116,7 @@
 - [x] Save feature list, model artifact, metrics, and version metadata.
 - [x] Add model registry index for saved bundles.
 - [x] Add richer model registry summaries by metrics and created date.
+- [x] Add run summary writer for comparison, markdown, and calibration artifacts.
 
 ## Phase 9 — Offline evaluation
 
@@ -138,9 +144,13 @@
 - [x] Add model registry summary command.
 - [x] Add model compare command.
 - [x] Add model compare markdown command.
+- [x] Add model run summary command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add CNN calibration review command.
+- [x] Add local footage catalog command.
+- [x] Add local object model video process command.
+- [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
 - [x] Add local pipeline command docs.
@@ -148,8 +158,8 @@
 
 ## Immediate next commits
 
-1. Add real YOLO/Ultralytics adapter option behind optional dependency gates.
-2. Add grouped tensor samples with time ordering column support.
-3. Add richer example fixtures for processed StatsBomb/Metrica/SoccerNet paths.
-4. Add model report bundle that writes CSV, markdown, and calibration artifacts together.
-5. Add CLI command to run the full tiny example pipeline end to end.
+1. Add calibration-aware pixel-to-pitch conversion into the media processing loop.
+2. Add annotation export format for local object model fine-tuning.
+3. Add active learning sampling for low-confidence frames.
+4. Add end-to-end fine-tuning command that chains footage catalog -> object rows -> tensors -> train -> review.
+5. Add model/data cards for promoted fine-tuned bundles.
