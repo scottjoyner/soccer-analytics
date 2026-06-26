@@ -2,7 +2,15 @@
 
 These tiny fixtures are for smoke-testing local commands.
 
-Build tensor samples from flattened grid columns:
+## Open/local data fixtures
+
+```bash
+soccer-edge ingest write-processed --source examples/statsbomb --source-type statsbomb --output-dir data/processed/examples/ingest
+soccer-edge ingest write-processed --source examples/metrica --source-type metrica --output-dir data/processed/examples/ingest
+soccer-edge ingest write-processed --source examples/soccernet --source-type soccernet --output-dir data/processed/examples/ingest
+```
+
+## Build tensor samples from flattened grid columns
 
 ```bash
 soccer-edge features tensor-samples \
@@ -17,7 +25,7 @@ soccer-edge features tensor-samples \
   --group match_id
 ```
 
-Train a simple model and export predictions:
+## Train a simple model and export predictions
 
 ```bash
 soccer-edge train simple \
@@ -30,4 +38,10 @@ soccer-edge model predict \
   --bundle-dir data/processed/examples/simple_model \
   --source examples/tiny_training.csv \
   --output data/processed/examples/predictions.csv
+```
+
+## Run the full tiny pipeline
+
+```bash
+soccer-edge examples tiny --repo-root . --output-dir data/processed/examples/tiny_pipeline
 ```
