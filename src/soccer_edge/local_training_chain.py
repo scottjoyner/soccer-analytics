@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pandas as pd
+
 from soccer_edge.active_sampling import write_low_confidence_rows
 from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.cards import write_data_card, write_model_card
@@ -9,7 +11,6 @@ from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
 from soccer_edge.video.local_catalog import write_local_video_catalog
-import pandas as pd
 
 
 def run_local_training_chain(
