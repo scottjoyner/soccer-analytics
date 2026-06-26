@@ -38,4 +38,4 @@ jobs:
           python -m pip install -r requirements-ml.txt
           python -m pip install -e .
       - name: Run ML tests
-        run: pytest tests/test_cnn_runner.py tests/test_cnn_outputs.py tests/test_cnn_training.py tests/test_torch_optional.py tests/test_temporal_training.py
+        run: pytest tests/test_cnn_runner.py tests/test_cnn_outputs.py tests/test_cnn_review.py tests/test_cnn_training.py tests/test_torch_optional.py tests/test_temporal_training.py
