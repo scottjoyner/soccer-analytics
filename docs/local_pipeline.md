@@ -12,6 +12,8 @@ soccer-edge model registry-summary --root-dir data/processed --output data/proce
 soccer-edge model compare --registry data/processed/model_registry_summary.csv --output data/processed/model_comparison.csv
 soccer-edge model compare-markdown --comparison data/processed/model_comparison.csv --output data/processed/model_comparison.md
 soccer-edge model run-summary --registry data/processed/model_registry_summary.csv --predictions data/processed/predictions.csv --output-dir data/processed/run_summary
+soccer-edge model model-card --bundle-dir data/processed/simple_model --output data/processed/MODEL_CARD.md
+soccer-edge model data-card --dataset-name local-dataset --sources data/raw/video_licensed,data/processed/inplay_features.parquet --output data/processed/DATA_CARD.md --rights-status owned
 soccer-edge model calibration-review --predictions data/processed/predictions.csv --output-dir data/processed/calibration_review
 ```
 
@@ -30,6 +32,21 @@ Local media processing remains restricted to files you have rights to process. T
 soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100
+soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
+soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
+```
+
+Run the local chain from approved footage plus existing tabular/grid feature files:
+
+```bash
+soccer-edge train local-chain \
+  --footage-root data/raw/video_licensed \
+  --tabular-source examples/tiny_training.csv \
+  --grid-source examples/tiny_grid_features.csv \
+  --output-dir data/processed/local_training_chain \
+  --tabular-columns speed_last,pressure_last \
+  --grid-columns g0,g1,g2,g3 \
+  --order timestamp_seconds
 ```
 
 Run the tiny example pipeline:
