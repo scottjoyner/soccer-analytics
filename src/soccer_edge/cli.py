@@ -19,7 +19,8 @@ from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.media_pipeline import run_media_table_stub
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.cnn_runner import train_cnn_from_npz
-from soccer_edge.models.registry import write_registry_index
+from soccer_edge.models.prediction_export import export_bundle_predictions
+from soccer_edge.models.registry import write_registry_index, write_registry_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.state_tables import write_video_state_tables
@@ -252,6 +253,32 @@ def model_registry(
     """Build an index of saved model bundles."""
 
     path = write_registry_index(root_dir, output)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("registry-summary")
+def model_registry_summary(
+    root_dir: Path = typer.Option(Path("data/processed")),
+    output: Path = typer.Option(Path("data/processed/model_registry_summary.csv")),
+    metric: str = typer.Option("accuracy"),
+) -> None:
+    """Build a sorted summary of saved model bundles."""
+
+    path = write_registry_summary(root_dir, output, metric=metric)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("predict")
+def model_predict(
+    bundle_dir: Path = typer.Option(..., exists=True),
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/predictions.csv")),
+    columns: str | None = typer.Option(None, help="Optional comma-separated feature override."),
+) -> None:
+    """Write predictions from a saved model bundle."""
+
+    feature_columns = None if columns is None else [column.strip() for column in columns.split(",") if column.strip()]
+    path = export_bundle_predictions(bundle_dir=bundle_dir, source=source, output=output, feature_columns=feature_columns)
     console.print(f"wrote={path}")
 
 
