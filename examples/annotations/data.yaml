@@ -1,0 +1,6 @@
+path: examples
+train: video_review/images/train
+val: video_review/images/val
+names:
+  0: player
+  1: ball
