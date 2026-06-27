@@ -22,6 +22,7 @@
 - [x] Add linting and test tooling.
 - [x] Add CI workflow.
 - [x] Add optional ML CI workflow job.
+- [x] Add model/data card validation checks in CI.
 
 ## Phase 2 — Storage layer
 
@@ -70,8 +71,10 @@
 - [x] Add optional local object model bridge.
 - [x] Add local footage catalog manifest command.
 - [x] Add calibration-aware pixel-to-pitch conversion into the media processing loop.
+- [x] Load homography calibration files from JSON/YAML in the media process command.
 - [x] Add annotation export format for local object model fine-tuning.
 - [x] Add active learning sampling for low-confidence frames.
+- [x] Add object crop export for low-confidence review rows.
 
 ## Phase 6 — CV feature generation
 
@@ -121,6 +124,7 @@
 - [x] Add richer model registry summaries by metrics and created date.
 - [x] Add run summary writer for comparison, markdown, and calibration artifacts.
 - [x] Add model/data cards for promoted fine-tuned bundles.
+- [x] Add full object-model training command behind optional dependency gates.
 
 ## Phase 9 — Offline evaluation
 
@@ -142,6 +146,7 @@
 - [x] Add simple training command.
 - [x] Add CNN training command.
 - [x] Add local training chain command.
+- [x] Add object model training command.
 - [x] Add model bundle save command.
 - [x] Add model prediction command.
 - [x] Add CNN prediction command.
@@ -151,12 +156,13 @@
 - [x] Add model compare markdown command.
 - [x] Add model run summary command.
 - [x] Add model/data card commands.
+- [x] Add model/data card validation command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add CNN calibration review command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
-- [x] Add annotation export and low-confidence sampling commands.
+- [x] Add annotation export, low-confidence sampling, and crop export commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
@@ -165,8 +171,8 @@
 
 ## Immediate next commits
 
-1. Load homography calibration files from JSON/YAML in the media process command.
-2. Add object crop export for low-confidence review rows.
-3. Add model/data card validation checks in CI.
-4. Add a full object-model training command once the final annotation format and training backend are selected.
+1. Add video-frame export that creates `image_path` rows directly from local footage.
+2. Add crop-review HTML contact sheet generation.
+3. Add calibration visual QA plots for pitch-space projection.
+4. Add annotation dataset config writer for local object-model training.
 5. Add richer examples for complete processed video and pitch-calibrated outputs.
