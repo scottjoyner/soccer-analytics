@@ -40,6 +40,28 @@ soccer-edge model predict \
   --output data/processed/examples/predictions.csv
 ```
 
+## Video review and calibration examples
+
+```bash
+soccer-edge video calibration-qa \
+  --calibration examples/calibration/pitch_calibration.json \
+  --csv-output data/processed/examples/calibration_qa.csv \
+  --svg-output data/processed/examples/calibration_qa.svg
+
+soccer-edge video contact-sheet \
+  --source examples/video_review/crop_manifest.csv \
+  --output data/processed/examples/crop_review.html
+
+soccer-edge video annotation-config \
+  --root examples \
+  --train-images video_review/images/train \
+  --val-images video_review/images/val \
+  --classes player,ball \
+  --output data/processed/examples/data.yaml
+```
+
+The `examples/video_review/detections_with_images.csv` file shows the expected columns for crop export. The referenced image files are placeholders; use local exported frame images when running crop extraction.
+
 ## Run the full tiny pipeline
 
 ```bash
