@@ -1,0 +1,3 @@
+frame_idx,class_name,confidence,crop_path
+1,player,0.42,data/processed/crops/1_0_player.jpg
+2,ball,0.31,data/processed/crops/2_1_ball.jpg
