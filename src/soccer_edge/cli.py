@@ -9,8 +9,10 @@ from rich.console import Console
 from soccer_edge.active_sampling import write_low_confidence_rows
 from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
+from soccer_edge.card_validation import assert_valid_cards
 from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
+from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
@@ -36,7 +38,9 @@ from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
 from soccer_edge.object_model import LocalObjectRunner
+from soccer_edge.object_training import ObjectTrainingConfig, run_object_training
 from soccer_edge.video.batch_runner import build_processing_plan
+from soccer_edge.video.calibration_io import load_homography
 from soccer_edge.video.local_catalog import write_local_video_catalog
 from soccer_edge.video.state_tables import write_video_state_tables
 
@@ -176,12 +180,14 @@ def process_video_local_model(
     output_dir: Path = typer.Option(Path("data/processed/video_model")),
     stride: int = typer.Option(1),
     max_samples: int | None = typer.Option(None),
+    calibration: Path | None = typer.Option(None, exists=False),
 ) -> None:
     """Run optional local object-model inference over approved local footage."""
 
     runner = LocalObjectRunner(model_path)
     callback = make_media_callback(runner)
-    paths = run_media_processing_loop(input_path=input_path, output_dir=output_dir, callback=callback, stride=stride, max_samples=max_samples)
+    transform = load_homography(calibration) if calibration is not None else None
+    paths = run_media_processing_loop(input_path=input_path, output_dir=output_dir, callback=callback, stride=stride, max_samples=max_samples, transform=transform)
     console.print({name: str(path) for name, path in paths.items()})
 
 
@@ -210,6 +216,19 @@ def sample_low_confidence(
     """Write low-confidence detection rows for review."""
 
     path = write_low_confidence_rows(source, output, threshold=threshold, limit=limit)
+    console.print(f"wrote={path}")
+
+
+@video_app.command("export-crops")
+def export_crops(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/crops")),
+    manifest_output: Path = typer.Option(Path("data/processed/crop_manifest.csv")),
+    image_path_column: str = typer.Option("image_path"),
+) -> None:
+    """Export object crops from local frame image rows."""
+
+    path = export_image_crops_from_table(source, output_dir, manifest_output, image_path_column=image_path_column)
     console.print(f"wrote={path}")
 
 
@@ -352,6 +371,22 @@ def train_local_chain(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@train_app.command("object-model")
+def train_object_model(
+    data_config: Path = typer.Option(..., exists=True),
+    base_model: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/object_training")),
+    run_name: str = typer.Option("local_object_model"),
+    epochs: int = typer.Option(50),
+    image_size: int = typer.Option(640),
+) -> None:
+    """Run optional local object-model training."""
+
+    config = ObjectTrainingConfig(data_config=data_config, base_model=base_model, output_dir=output_dir, run_name=run_name, epochs=epochs, image_size=image_size)
+    paths = run_object_training(config)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
 @train_app.command("prematch")
 def train_prematch() -> None:
     """Train prematch model placeholder."""
@@ -491,6 +526,17 @@ def data_card(
     source_paths = [Path(source.strip()) for source in sources.split(",") if source.strip()]
     path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status)
     console.print(f"wrote={path}")
+
+
+@model_app.command("validate-cards")
+def validate_cards(
+    model_card_path: Path | None = typer.Option(None, exists=False),
+    data_card_path: Path | None = typer.Option(None, exists=False),
+) -> None:
+    """Validate model and data card required sections."""
+
+    assert_valid_cards(model_card_path, data_card_path)
+    console.print("cards_valid=true")
 
 
 @model_app.command("calibration-review-cnn")
