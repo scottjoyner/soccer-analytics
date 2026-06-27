@@ -70,11 +70,15 @@
 - [x] Add media inference adapter implementation.
 - [x] Add optional local object model bridge.
 - [x] Add local footage catalog manifest command.
+- [x] Add video-frame export that creates `image_path` rows directly from local footage.
 - [x] Add calibration-aware pixel-to-pitch conversion into the media processing loop.
 - [x] Load homography calibration files from JSON/YAML in the media process command.
+- [x] Add calibration visual QA plots for pitch-space projection.
 - [x] Add annotation export format for local object model fine-tuning.
+- [x] Add annotation dataset config writer for local object-model training.
 - [x] Add active learning sampling for low-confidence frames.
 - [x] Add object crop export for low-confidence review rows.
+- [x] Add crop-review HTML contact sheet generation.
 
 ## Phase 6 — CV feature generation
 
@@ -162,17 +166,18 @@
 - [x] Add CNN calibration review command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
-- [x] Add annotation export, low-confidence sampling, and crop export commands.
+- [x] Add frame export, annotation export, low-confidence sampling, crop export, contact sheet, calibration QA, and annotation-config commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
+- [x] Add richer examples for complete processed video and pitch-calibrated outputs.
 - [x] Add local pipeline command docs.
 - [x] Add docs for NPZ tensor dataset format.
 
 ## Immediate next commits
 
-1. Add video-frame export that creates `image_path` rows directly from local footage.
-2. Add crop-review HTML contact sheet generation.
-3. Add calibration visual QA plots for pitch-space projection.
-4. Add annotation dataset config writer for local object-model training.
-5. Add richer examples for complete processed video and pitch-calibrated outputs.
+1. Add frame/detection join helper to attach `image_path` to detection rows by `frame_idx`.
+2. Add annotation train/val splitter for exported frames and labels.
+3. Add QA summary markdown for calibration error statistics.
+4. Add CI smoke test for example video-review commands.
+5. Add richer examples with real tiny local image fixtures when binary fixtures are allowed.
