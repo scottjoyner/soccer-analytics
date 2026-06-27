@@ -81,24 +81,27 @@ soccer-edge video catalog-local --root data/raw/video_licensed --output manifest
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
 ```
 
-5. Run the scaffold process command or the optional local object-model command:
+5. Export frame images, run calibration QA, then process local footage:
 
 ```bash
-soccer-edge video process --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/video_pipeline --frame-count 100
+soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
+soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
 ```
 
-6. Export annotations, review low-confidence rows, and export crops from local frame images:
+6. Export annotations, review low-confidence rows, export crops, and build a contact sheet:
 
 ```bash
 soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
 soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
+soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
 ```
 
-7. Train the optional local object model only after annotation data and rights status are recorded:
+7. Write an annotation dataset config and train the optional local object model only after annotation data and rights status are recorded:
 
 ```bash
+soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
 soccer-edge train object-model --data-config data/processed/annotations/data.yaml --base-model models/local-object-model.pt --output-dir data/processed/object_training --run-name local_object_model --epochs 50 --image-size 640
 ```
 
@@ -126,18 +129,18 @@ The agent should prepare data for model fine-tuning in this order:
 3. Convert pixel-space detections to pitch-space state when calibration is available.
 4. Build rolling feature tables and preserve source metadata.
 5. Build tensor samples grouped by `match_id` and ordered by `timestamp_seconds` or `frame_idx`.
-6. Export normalized annotations, low-confidence review queues, and object crops for local object-model improvement.
+6. Export normalized annotations, low-confidence review queues, object crops, and contact sheets for local object-model improvement.
 7. Train baseline tabular models, CNN tensor models, and optional local object models.
 8. Export predictions, calibration reports, registry summaries, cards, and markdown comparison reports.
 9. Promote only model bundles with reproducible metadata, feature names, metrics, cards, and lineage.
 
 ## Suggested next implementation tasks
 
-1. Add video-frame export that creates `image_path` rows directly from local footage.
-2. Add crop-review HTML contact sheet generation.
-3. Add calibration visual QA plots for pitch-space projection.
-4. Add annotation dataset config writer for local object-model training.
-5. Add richer examples for complete processed video and pitch-calibrated outputs.
+1. Add frame/detection join helper to attach `image_path` to detection rows by `frame_idx`.
+2. Add annotation train/val splitter for exported frames and labels.
+3. Add QA summary markdown for calibration error statistics.
+4. Add CI smoke test for example video-review commands.
+5. Add richer examples with real tiny local image fixtures when binary fixtures are allowed.
 
 ## Quality gates
 
