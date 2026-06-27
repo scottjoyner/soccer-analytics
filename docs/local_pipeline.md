@@ -32,15 +32,19 @@ Local media processing remains restricted to files you have rights to process. T
 ```bash
 soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
+soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
+soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
 soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
 soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
+soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
 ```
 
-Optional local object-model training uses the annotation config produced outside this package and runs through the optional ML dependency stack.
+Optional local object-model training uses the annotation config and runs through the optional ML dependency stack.
 
 ```bash
+soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
 soccer-edge train object-model --data-config data/processed/annotations/data.yaml --base-model models/local-object-model.pt --output-dir data/processed/object_training --run-name local_object_model --epochs 50 --image-size 640
 ```
 
