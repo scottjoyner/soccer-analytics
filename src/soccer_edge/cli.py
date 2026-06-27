@@ -7,16 +7,20 @@ import typer
 from rich.console import Console
 
 from soccer_edge.active_sampling import write_low_confidence_rows
+from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
 from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
+from soccer_edge.calibration_qa import write_projection_qa_csv, write_projection_qa_svg
 from soccer_edge.card_validation import assert_valid_cards
 from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
+from soccer_edge.contact_sheet import write_contact_sheet
 from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
+from soccer_edge.frame_export import export_video_frame_manifest
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
 from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
@@ -173,6 +177,20 @@ def process_video(
     console.print(result)
 
 
+@video_app.command("export-frames")
+def export_frames(
+    input_path: Path = typer.Option(..., "--input", exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/frames")),
+    manifest_output: Path = typer.Option(Path("data/processed/frame_manifest.csv")),
+    stride: int = typer.Option(1),
+    max_frames: int | None = typer.Option(None),
+) -> None:
+    """Export local video frames and a manifest with image paths."""
+
+    path = export_video_frame_manifest(input_path, output_dir, manifest_output, stride=stride, max_frames=max_frames)
+    console.print(f"wrote={path}")
+
+
 @video_app.command("process-local-model")
 def process_video_local_model(
     input_path: Path = typer.Option(..., "--input", exists=True),
@@ -206,6 +224,22 @@ def export_annotations(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@video_app.command("annotation-config")
+def annotation_config(
+    root: Path = typer.Option(...),
+    train_images: Path = typer.Option(...),
+    val_images: Path = typer.Option(...),
+    classes: str = typer.Option("player,ball"),
+    output: Path = typer.Option(Path("data/processed/annotations/data.yaml")),
+    test_images: Path | None = typer.Option(None),
+) -> None:
+    """Write annotation dataset config for local object-model training."""
+
+    class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
+    path = write_annotation_dataset_config_from_values(root, train_images, val_images, class_names, output, test_images=test_images)
+    console.print(f"wrote={path}")
+
+
 @video_app.command("sample-low-confidence")
 def sample_low_confidence(
     source: Path = typer.Option(..., exists=True),
@@ -230,6 +264,32 @@ def export_crops(
 
     path = export_image_crops_from_table(source, output_dir, manifest_output, image_path_column=image_path_column)
     console.print(f"wrote={path}")
+
+
+@video_app.command("contact-sheet")
+def crop_contact_sheet(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/crop_review.html")),
+    title: str = typer.Option("Crop Review"),
+    image_column: str = typer.Option("crop_path"),
+) -> None:
+    """Write an HTML contact sheet for crop review."""
+
+    path = write_contact_sheet(source, output, title=title, image_column=image_column)
+    console.print(f"wrote={path}")
+
+
+@video_app.command("calibration-qa")
+def calibration_qa(
+    calibration: Path = typer.Option(..., exists=True),
+    csv_output: Path = typer.Option(Path("data/processed/calibration_qa.csv")),
+    svg_output: Path = typer.Option(Path("data/processed/calibration_qa.svg")),
+) -> None:
+    """Write calibration error table and SVG visual QA."""
+
+    csv_path = write_projection_qa_csv(calibration, csv_output)
+    svg_path = write_projection_qa_svg(calibration, svg_output)
+    console.print({"csv": str(csv_path), "svg": str(svg_path)})
 
 
 @features_app.command("build")
