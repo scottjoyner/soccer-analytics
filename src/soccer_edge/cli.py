@@ -8,9 +8,11 @@ from rich.console import Console
 
 from soccer_edge.active_sampling import write_low_confidence_rows
 from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
+from soccer_edge.annotation_split import write_annotation_split
 from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
 from soccer_edge.calibration_qa import write_projection_qa_csv, write_projection_qa_svg
+from soccer_edge.calibration_summary import write_calibration_summary
 from soccer_edge.card_validation import assert_valid_cards
 from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
@@ -21,6 +23,7 @@ from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.frame_export import export_video_frame_manifest
+from soccer_edge.frame_join import attach_image_paths_from_tables
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
 from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
@@ -209,6 +212,20 @@ def process_video_local_model(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@video_app.command("attach-frame-images")
+def attach_frame_images(
+    detections: Path = typer.Option(..., exists=True),
+    frame_manifest: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/detections_with_images.csv")),
+    frame_column: str = typer.Option("frame_idx"),
+    image_path_column: str = typer.Option("image_path"),
+) -> None:
+    """Attach exported frame image paths to detection rows by frame index."""
+
+    path = attach_image_paths_from_tables(detections, frame_manifest, output, frame_column=frame_column, image_path_column=image_path_column)
+    console.print(f"wrote={path}")
+
+
 @video_app.command("export-annotations")
 def export_annotations(
     source: Path = typer.Option(..., exists=True),
@@ -221,6 +238,20 @@ def export_annotations(
 
     class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
     paths = write_detection_annotations_from_table(source, output_dir, class_names, image_width, image_height)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@video_app.command("split-annotations")
+def split_annotations(
+    source: Path = typer.Option(..., exists=True),
+    train_output: Path = typer.Option(Path("data/processed/annotations/train.csv")),
+    val_output: Path = typer.Option(Path("data/processed/annotations/val.csv")),
+    train_fraction: float = typer.Option(0.8),
+    group_column: str = typer.Option("frame_idx"),
+) -> None:
+    """Split annotation rows into train and validation CSVs."""
+
+    paths = write_annotation_split(source, train_output, val_output, train_fraction=train_fraction, group_column=group_column)
     console.print({name: str(path) for name, path in paths.items()})
 
 
@@ -290,6 +321,18 @@ def calibration_qa(
     csv_path = write_projection_qa_csv(calibration, csv_output)
     svg_path = write_projection_qa_svg(calibration, svg_output)
     console.print({"csv": str(csv_path), "svg": str(svg_path)})
+
+
+@video_app.command("calibration-summary")
+def calibration_summary(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/calibration_qa.md")),
+    title: str = typer.Option("Calibration QA Summary"),
+) -> None:
+    """Write calibration error summary markdown from QA CSV."""
+
+    path = write_calibration_summary(source, output, title=title)
+    console.print(f"wrote={path}")
 
 
 @features_app.command("build")
