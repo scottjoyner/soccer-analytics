@@ -32,6 +32,7 @@
 - [x] Define schemas for matches, events, frames, ball states, player states, features, and labels.
 - [x] Add basic schema tests.
 - [x] Add graph export payload path for match, frame, feature, and model-run metadata.
+- [x] Add Neo4j graph export payloads for dataset versions, annotation audits, and model evaluation summaries.
 
 ## Phase 3 — Open data ingestion
 
@@ -85,8 +86,10 @@
 - [x] Add annotation dataset config writer for local object-model training.
 - [x] Add active learning sampling for low-confidence frames.
 - [x] Add object crop export for low-confidence review rows.
+- [x] Add automatic correction merge helpers for reviewed low-confidence crops.
 - [x] Add crop-review HTML contact sheet generation.
 - [x] Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
+- [x] Add dataset version IDs into data-card and model-card metadata.
 - [x] Add automatic data-card population from training source catalog plus manifest stats.
 - [x] Add richer examples with tiny local image fixtures.
 
@@ -140,6 +143,7 @@
 - [x] Add model/data cards for promoted fine-tuned bundles.
 - [x] Add full object-model training command behind optional dependency gates.
 - [x] Add object-model evaluation ingest for precision/recall by class.
+- [x] Add object-model evaluation visual confusion matrix output.
 
 ## Phase 9 — Offline evaluation
 
@@ -162,6 +166,7 @@
 - [x] Add CNN training command.
 - [x] Add local training chain command.
 - [x] Add local fine-tuning pipeline command.
+- [x] Add local fine-tune dry-run mode that writes a runnable shell plan without executing optional dependencies.
 - [x] Add object model training command.
 - [x] Add model bundle save command.
 - [x] Add model prediction command.
@@ -178,10 +183,11 @@
 - [x] Add model calibration review command.
 - [x] Add CNN calibration review command.
 - [x] Add object-model evaluation command.
+- [x] Add object confusion matrix command.
 - [x] Add source catalog command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
-- [x] Add frame export, frame image join, annotation export/split/audit, dataset versions, low-confidence sampling, crop export, contact sheet, calibration QA/summary, and annotation-config commands.
+- [x] Add frame export, frame image join, correction merge, annotation export/split/audit, dataset versions, low-confidence sampling, crop export, contact sheet, calibration QA/summary, and annotation-config commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
@@ -191,8 +197,8 @@
 
 ## Immediate next commits
 
-1. Add dataset version IDs into data-card and model-card metadata.
-2. Add automatic correction merge helpers for reviewed low-confidence crops.
-3. Add object-model evaluation visual confusion matrix output.
-4. Add local fine-tune dry-run mode that writes a runnable shell plan without executing optional dependencies.
-5. Add Neo4j graph export payloads for dataset versions, annotation audits, and model evaluation summaries.
+1. Add automatic correction-review UI export for class/bbox changes.
+2. Add dry-run plan validation that checks command paths and missing inputs.
+3. Add graph export file writers for dataset/version/evaluation payload batches.
+4. Add dataset-card/model-card cross-links to graph payload IDs.
+5. Add promotion gate command that validates cards, versions, audits, and object metrics together.
