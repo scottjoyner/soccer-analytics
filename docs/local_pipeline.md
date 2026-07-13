@@ -12,8 +12,8 @@ soccer-edge model registry-summary --root-dir data/processed --output data/proce
 soccer-edge model compare --registry data/processed/model_registry_summary.csv --output data/processed/model_comparison.csv
 soccer-edge model compare-markdown --comparison data/processed/model_comparison.csv --output data/processed/model_comparison.md
 soccer-edge model run-summary --registry data/processed/model_registry_summary.csv --predictions data/processed/predictions.csv --output-dir data/processed/run_summary
-soccer-edge model model-card --bundle-dir data/processed/simple_model --output data/processed/MODEL_CARD.md
-soccer-edge model data-card --dataset-name local-dataset --sources data/raw/video_licensed,data/processed/inplay_features.parquet --output data/processed/DATA_CARD.md --rights-status owned
+soccer-edge model model-card --bundle-dir data/processed/simple_model --output data/processed/MODEL_CARD.md --version-paths data/processed/inplay_features.parquet
+soccer-edge model data-card --dataset-name local-dataset --sources data/raw/video_licensed,data/processed/inplay_features.parquet --output data/processed/DATA_CARD.md --rights-status owned --version-paths data/processed/inplay_features.parquet
 soccer-edge model validate-cards --model-card-path data/processed/MODEL_CARD.md --data-card-path data/processed/DATA_CARD.md
 soccer-edge model calibration-review --predictions data/processed/predictions.csv --output-dir data/processed/calibration_review
 ```
@@ -37,13 +37,14 @@ soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --
 soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
 soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
-soccer-edge video export-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
-soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
-soccer-edge video audit-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotation_audit
-soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
+soccer-edge video merge-corrections --base data/processed/detections_with_images.csv --corrections data/processed/reviewed_corrections.csv --output data/processed/corrected_detections.csv --keys crop_path
+soccer-edge video export-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
+soccer-edge video split-annotations --source data/processed/corrected_detections.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video audit-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotation_audit
+soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 ```
 
 Object-model evaluation and data-card generation:
@@ -51,7 +52,8 @@ Object-model evaluation and data-card generation:
 ```bash
 soccer-edge model source-catalog --output data/processed/training_sources.csv
 soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
-soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md
+soccer-edge model object-confusion --source data/processed/object_eval_rows.csv --table-output data/processed/object_confusion.csv --svg-output data/processed/object_confusion.svg
+soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md --version-paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv
 ```
 
 Optional local object-model training uses the annotation config and runs through the optional ML dependency stack.
@@ -72,6 +74,18 @@ soccer-edge train local-finetune \
   --calibration-path configs/pitch_calibration.json \
   --stride 5 \
   --max-frames 100
+```
+
+Dry-run the full fine-tuning path without invoking optional media/model dependencies:
+
+```bash
+soccer-edge train local-finetune \
+  --input data/raw/video_licensed/clip.mp4 \
+  --object-model-path models/local-object-model.pt \
+  --output-dir data/processed/local_finetune \
+  --classes player,ball \
+  --calibration-path configs/pitch_calibration.json \
+  --dry-run-plan data/processed/local_finetune/plan.sh
 ```
 
 Run the local chain from approved footage plus existing tabular/grid feature files:
