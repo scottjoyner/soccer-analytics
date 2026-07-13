@@ -64,7 +64,7 @@ def write_data_card(
     dataset_id: str | None = None,
     version_paths: list[Path] | None = None,
 ) -> Path:
-    version_id = resolved_dataset_version_id(dataset_id, version_paths or source_paths)
+    version_id = resolved_dataset_version_id(dataset_id, version_paths)
     lines = [
         f"# Data Card: {dataset_name}",
         "",
