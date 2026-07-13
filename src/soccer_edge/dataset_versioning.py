@@ -45,6 +45,18 @@ def dataset_versions(paths: list[Path]) -> pd.DataFrame:
     return pd.DataFrame([asdict(asset_version(path)) for path in paths])
 
 
+def dataset_version_id(paths: list[Path], prefix: str = "ds") -> str:
+    versions = sorted((asset_version(path) for path in paths), key=lambda item: item.path)
+    digest = hashlib.sha256()
+    for version in versions:
+        digest.update(version.path.encode("utf-8"))
+        digest.update(version.sha256.encode("utf-8"))
+        digest.update(str(version.size_bytes).encode("utf-8"))
+        digest.update(str(version.row_count).encode("utf-8"))
+        digest.update(str(version.column_count).encode("utf-8"))
+    return f"{prefix}_{digest.hexdigest()[:16]}"
+
+
 def write_dataset_versions(paths: list[Path], output: Path) -> Path:
     frame = dataset_versions(paths)
     output.parent.mkdir(parents=True, exist_ok=True)
