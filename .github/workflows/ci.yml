@@ -23,6 +23,8 @@ jobs:
         run: pytest
       - name: Validate card helpers
         run: pytest tests/test_card_validation.py tests/test_cards.py
+      - name: Video review smoke tests
+        run: pytest tests/test_cli_next_video_tools.py tests/test_cli_data_integrations.py tests/test_frame_join.py tests/test_annotation_split.py tests/test_calibration_summary.py
       - name: Run ruff
         run: ruff check src tests
 
