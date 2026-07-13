@@ -39,9 +39,19 @@ soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 -
 soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
 soccer-edge video export-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
 soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video audit-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotation_audit
+soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
+```
+
+Object-model evaluation and data-card generation:
+
+```bash
+soccer-edge model source-catalog --output data/processed/training_sources.csv
+soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
+soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md
 ```
 
 Optional local object-model training uses the annotation config and runs through the optional ML dependency stack.
@@ -49,6 +59,19 @@ Optional local object-model training uses the annotation config and runs through
 ```bash
 soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
 soccer-edge train object-model --data-config data/processed/annotations/data.yaml --base-model models/local-object-model.pt --output-dir data/processed/object_training --run-name local_object_model --epochs 50 --image-size 640
+```
+
+Full local fine-tuning path, when optional media/object-model dependencies are installed:
+
+```bash
+soccer-edge train local-finetune \
+  --input data/raw/video_licensed/clip.mp4 \
+  --object-model-path models/local-object-model.pt \
+  --output-dir data/processed/local_finetune \
+  --classes player,ball \
+  --calibration-path configs/pitch_calibration.json \
+  --stride 5 \
+  --max-frames 100
 ```
 
 Run the local chain from approved footage plus existing tabular/grid feature files:
