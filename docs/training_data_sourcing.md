@@ -54,7 +54,13 @@ soccer-edge video export-crops --source data/processed/low_confidence.csv --outp
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
 ```
 
-Human review should promote corrected rows back into the annotation set. The corrected annotations can then be exported, split, audited, and versioned:
+Human review should promote corrected rows back into the annotation set. Correction tables can include `review_action` values such as `correct`, `keep`, or `drop`, plus fields like `corrected_class_name`, `corrected_x1`, `corrected_y1`, `corrected_x2`, and `corrected_y2`.
+
+```bash
+soccer-edge video merge-corrections --base data/processed/detections_with_images.csv --corrections data/processed/reviewed_corrections.csv --output data/processed/corrected_detections.csv --keys crop_path
+```
+
+Corrected annotations can then be exported, split, audited, and versioned:
 
 ```bash
 soccer-edge video export-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
@@ -66,12 +72,13 @@ soccer-edge video annotation-config --root data/processed/annotations --train-im
 
 ### Tier 4 — Evaluation and promotion metadata
 
-Before promoting a fine-tuned dataset or model, generate a source catalog, automatic data card, and class-level object metrics.
+Before promoting a fine-tuned dataset or model, generate a source catalog, automatic data card, object metrics, and a confusion matrix.
 
 ```bash
 soccer-edge model source-catalog --output data/processed/training_sources.csv
-soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md
+soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md --version-paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv
 soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
+soccer-edge model object-confusion --source data/processed/object_eval_rows.csv --table-output data/processed/object_confusion.csv --svg-output data/processed/object_confusion.svg
 ```
 
 ## Training-data priorities
@@ -80,7 +87,7 @@ soccer-edge model object-eval --source data/processed/object_eval_rows.csv --out
 2. **State and tracking model**: use Metrica tracking data to validate pitch-space state features and rolling-window table generation.
 3. **Broadcast/video model**: use SoccerNet only after confirming access terms for the specific task/subset.
 4. **Local object model**: use owned/licensed local footage, exported frames, detection review queues, and corrected annotations.
-5. **Fine-tuning bundle**: promote only datasets with data cards, source manifests, rights status, feature lineage, model cards, dataset versions, audits, and calibration reports.
+5. **Fine-tuning bundle**: promote only datasets with data cards, source manifests, rights status, feature lineage, model cards, dataset versions, audits, graph payloads, and calibration reports.
 
 ## Full local fine-tuning command
 
@@ -97,11 +104,24 @@ soccer-edge train local-finetune \
   --max-frames 100
 ```
 
+Use dry-run mode to write a shell plan without executing optional media/model dependencies:
+
+```bash
+soccer-edge train local-finetune \
+  --input data/raw/video_licensed/clip.mp4 \
+  --object-model-path models/local-object-model.pt \
+  --output-dir data/processed/local_finetune \
+  --classes player,ball \
+  --calibration-path configs/pitch_calibration.json \
+  --dry-run-plan data/processed/local_finetune/plan.sh
+```
+
 ## Minimum dataset card checklist
 
 Every training dataset should have:
 
 - Dataset name and version.
+- Dataset version ID.
 - Source roots or manifests.
 - Rights status.
 - Allowed use.
@@ -113,6 +133,7 @@ Every training dataset should have:
 - Link to calibration QA artifacts when pitch-space labels are used.
 - Dataset asset hashes.
 - Annotation audit summaries.
+- Object evaluation metrics or notes explaining why unavailable.
 
 ## Label taxonomy
 
@@ -156,4 +177,4 @@ ruff check src tests
 - Do not download match videos from public platforms for training.
 - Do not silently process footage with `pending`, `unknown`, or missing rights status.
 - Do not mix train and validation labels from the same frame group unless explicitly testing leakage.
-- Do not promote a model without data cards, model cards, dataset versions, audits, and calibration/evaluation artifacts.
+- Do not promote a model without data cards, model cards, dataset versions, audits, graph payloads, and calibration/evaluation artifacts.
