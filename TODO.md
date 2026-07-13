@@ -23,6 +23,7 @@
 - [x] Add CI workflow.
 - [x] Add optional ML CI workflow job.
 - [x] Add model/data card validation checks in CI.
+- [x] Add CI smoke test for example video-review commands.
 
 ## Phase 2 — Storage layer
 
@@ -44,6 +45,8 @@
 - [x] Wire local StatsBomb/Metrica/SoccerNet loaded frames into stored processed tables.
 - [x] Add processed StatsBomb fixture coverage.
 - [x] Add richer example fixtures for processed StatsBomb/Metrica/SoccerNet paths.
+- [x] Add deeper training data sourcing strategy.
+- [x] Add training source catalog helper.
 
 ## Phase 4 — Video discovery metadata
 
@@ -71,14 +74,18 @@
 - [x] Add optional local object model bridge.
 - [x] Add local footage catalog manifest command.
 - [x] Add video-frame export that creates `image_path` rows directly from local footage.
+- [x] Add frame/detection join helper to attach `image_path` to detection rows by `frame_idx`.
 - [x] Add calibration-aware pixel-to-pitch conversion into the media processing loop.
 - [x] Load homography calibration files from JSON/YAML in the media process command.
 - [x] Add calibration visual QA plots for pitch-space projection.
+- [x] Add QA summary markdown for calibration error statistics.
 - [x] Add annotation export format for local object model fine-tuning.
+- [x] Add annotation train/val splitter for exported frames and labels.
 - [x] Add annotation dataset config writer for local object-model training.
 - [x] Add active learning sampling for low-confidence frames.
 - [x] Add object crop export for low-confidence review rows.
 - [x] Add crop-review HTML contact sheet generation.
+- [x] Add richer examples with tiny local image fixtures.
 
 ## Phase 6 — CV feature generation
 
@@ -166,7 +173,7 @@
 - [x] Add CNN calibration review command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
-- [x] Add frame export, annotation export, low-confidence sampling, crop export, contact sheet, calibration QA, and annotation-config commands.
+- [x] Add frame export, frame image join, annotation export/split, low-confidence sampling, crop export, contact sheet, calibration QA/summary, and annotation-config commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
@@ -176,8 +183,8 @@
 
 ## Immediate next commits
 
-1. Add frame/detection join helper to attach `image_path` to detection rows by `frame_idx`.
-2. Add annotation train/val splitter for exported frames and labels.
-3. Add QA summary markdown for calibration error statistics.
-4. Add CI smoke test for example video-review commands.
-5. Add richer examples with real tiny local image fixtures when binary fixtures are allowed.
+1. Add annotation label audit summaries by class, frame, and split.
+2. Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
+3. Add automatic data-card population from training source catalog plus manifest stats.
+4. Add object-model evaluation ingest for precision/recall by class.
+5. Add a full local fine-tuning pipeline command that chains frame export -> detection -> join -> review -> split -> config -> train.
