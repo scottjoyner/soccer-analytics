@@ -19,6 +19,7 @@ from soccer_edge.card_validation import assert_valid_cards
 from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
 from soccer_edge.contact_sheet import write_contact_sheet
+from soccer_edge.correction_merge import merge_reviewed_corrections_from_tables
 from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.dataset_versioning import write_dataset_versions
 from soccer_edge.evaluation.calibration_review import write_calibration_review
@@ -33,6 +34,7 @@ from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccerne
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
 from soccer_edge.local_finetune_pipeline import run_local_finetune_pipeline
+from soccer_edge.local_finetune_plan import write_local_finetune_shell_plan
 from soccer_edge.local_training_chain import run_local_training_chain
 from soccer_edge.media_inference import make_media_callback
 from soccer_edge.media_pipeline import run_media_table_stub
@@ -48,6 +50,7 @@ from soccer_edge.models.registry import write_registry_index, write_registry_sum
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
+from soccer_edge.object_confusion import write_confusion_outputs
 from soccer_edge.object_eval import write_object_eval_metrics
 from soccer_edge.object_model import LocalObjectRunner
 from soccer_edge.object_training import ObjectTrainingConfig, run_object_training
@@ -255,6 +258,21 @@ def dataset_versions_command(
 
     selected = [Path(item.strip()) for item in paths.split(",") if item.strip()]
     path = write_dataset_versions(selected, output)
+    console.print(f"wrote={path}")
+
+
+@video_app.command("merge-corrections")
+def merge_corrections(
+    base: Path = typer.Option(..., exists=True),
+    corrections: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/corrected_detections.csv")),
+    keys: str = typer.Option("crop_path"),
+    action_column: str = typer.Option("review_action"),
+) -> None:
+    """Merge reviewed low-confidence crop corrections back into detection rows."""
+
+    key_columns = [column.strip() for column in keys.split(",") if column.strip()]
+    path = merge_reviewed_corrections_from_tables(base, corrections, output, key_columns=key_columns, action_column=action_column)
     console.print(f"wrote={path}")
 
 
@@ -519,8 +537,25 @@ def train_local_finetune(
     train_fraction: float = typer.Option(0.8),
     threshold: float = typer.Option(0.5),
     train_object_model: bool = typer.Option(False),
+    dry_run_plan: Path | None = typer.Option(None, exists=False),
 ) -> None:
     """Run the local fine-tuning path from frames through optional object training."""
+
+    if dry_run_plan is not None:
+        plan_path = write_local_finetune_shell_plan(
+            output_path=dry_run_plan,
+            input_path=input_path,
+            object_model_path=object_model_path,
+            output_dir=output_dir,
+            classes=classes,
+            calibration_path=calibration_path,
+            stride=stride,
+            max_frames=max_frames,
+            threshold=threshold,
+            train_fraction=train_fraction,
+        )
+        console.print(f"wrote={plan_path}")
+        return
 
     class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
     outputs = run_local_finetune_pipeline(
@@ -675,10 +710,13 @@ def model_run_summary(
 def model_card(
     bundle_dir: Path = typer.Option(..., exists=True),
     output: Path = typer.Option(Path("MODEL_CARD.md")),
+    dataset_id: str | None = typer.Option(None),
+    version_paths: str | None = typer.Option(None, help="Optional comma-separated dataset paths to hash."),
 ) -> None:
     """Write a model card for a saved bundle."""
 
-    path = write_model_card(bundle_dir, output)
+    selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
+    path = write_model_card(bundle_dir, output, dataset_id=dataset_id, version_paths=selected)
     console.print(f"wrote={path}")
 
 
@@ -688,11 +726,14 @@ def data_card(
     sources: str = typer.Option(..., help="Comma-separated source paths."),
     output: Path = typer.Option(Path("DATA_CARD.md")),
     rights_status: str = typer.Option("owned"),
+    dataset_id: str | None = typer.Option(None),
+    version_paths: str | None = typer.Option(None, help="Optional comma-separated dataset paths to hash."),
 ) -> None:
     """Write a data card for approved local/open sources."""
 
     source_paths = [Path(source.strip()) for source in sources.split(",") if source.strip()]
-    path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status)
+    selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
+    path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status, dataset_id=dataset_id, version_paths=selected)
     console.print(f"wrote={path}")
 
 
@@ -731,6 +772,20 @@ def object_eval(
 
     path = write_object_eval_metrics(source, output, class_column=class_column, status_column=status_column)
     console.print(f"wrote={path}")
+
+
+@model_app.command("object-confusion")
+def object_confusion(
+    source: Path = typer.Option(..., exists=True),
+    table_output: Path = typer.Option(Path("data/processed/object_confusion.csv")),
+    svg_output: Path = typer.Option(Path("data/processed/object_confusion.svg")),
+    actual_column: str = typer.Option("actual_class"),
+    predicted_column: str = typer.Option("predicted_class"),
+) -> None:
+    """Write object-model confusion matrix table and SVG."""
+
+    paths = write_confusion_outputs(source, table_output, svg_output, actual_column=actual_column, predicted_column=predicted_column)
+    console.print({name: str(path) for name, path in paths.items()})
 
 
 @model_app.command("validate-cards")
