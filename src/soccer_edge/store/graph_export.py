@@ -21,6 +21,14 @@ def build_node_payload(label: str, row: object, key: str = "id") -> dict[str, An
     return {"statement": merge_node_statement(label, key), "props": props}
 
 
+def ensure_id(row: object, id_field: str, fallback_fields: list[str]) -> dict[str, Any]:
+    props = row_to_properties(row)
+    if id_field not in props:
+        values = [str(props.get(field, "")) for field in fallback_fields]
+        props[id_field] = "::".join(values)
+    return props
+
+
 def match_payload(row: object) -> dict[str, Any]:
     return build_node_payload("Match", row, key="match_id")
 
@@ -35,3 +43,18 @@ def feature_payload(row: object) -> dict[str, Any]:
 
 def run_payload(row: object) -> dict[str, Any]:
     return build_node_payload("ModelRun", row, key="name")
+
+
+def dataset_version_payload(row: object) -> dict[str, Any]:
+    props = ensure_id(row, "version_id", ["path", "sha256"])
+    return build_node_payload("DatasetVersion", props, key="version_id")
+
+
+def annotation_audit_payload(row: object) -> dict[str, Any]:
+    props = ensure_id(row, "audit_id", ["audit_name", "class_name", "frame_idx", "split"])
+    return build_node_payload("AnnotationAudit", props, key="audit_id")
+
+
+def object_evaluation_payload(row: object) -> dict[str, Any]:
+    props = ensure_id(row, "evaluation_id", ["class_name", "precision", "recall", "f1"])
+    return build_node_payload("ObjectEvaluation", props, key="evaluation_id")
