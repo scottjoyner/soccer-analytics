@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from soccer_edge.dataset_versioning import dataset_versions
+from soccer_edge.dataset_versioning import dataset_version_id, dataset_versions
 from soccer_edge.training_sources import training_sources_frame
 
 
@@ -34,12 +34,15 @@ def auto_data_card_markdown(
 ) -> str:
     manifest_frame = pd.DataFrame([manifest_stats(path) for path in manifests]) if manifests else pd.DataFrame()
     sources = training_sources_frame()
-    versions = dataset_versions(version_paths or manifests) if (version_paths or manifests) else pd.DataFrame()
+    selected_version_paths = version_paths or manifests
+    versions = dataset_versions(selected_version_paths) if selected_version_paths else pd.DataFrame()
+    version_id = dataset_version_id(selected_version_paths) if selected_version_paths else "unknown"
     return "\n".join(
         [
             f"# Data Card: {dataset_name}",
             "",
             f"Rights status: {rights_status}",
+            f"Dataset version ID: {version_id}",
             "",
             "## Source catalog",
             table_markdown(sources[["name", "tier", "modality", "rights_posture"]]),
