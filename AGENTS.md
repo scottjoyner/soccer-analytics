@@ -13,6 +13,14 @@ Build and operate the local soccer analytics pipeline for research, feature gene
 5. Preserve lineage fields on all processed tables and derived feature tables.
 6. Never enable external execution or real-money actions. This repository is research/offline evaluation only.
 
+## Training data sourcing
+
+Use `docs/training_data_sourcing.md` as the primary source policy. The recommended source tiers are:
+
+1. Open event/tracking data: StatsBomb Open Data, Metrica Sports Sample Data, and approved SoccerNet subsets.
+2. Rights-approved local footage: user-owned, licensed, or compatible-license files on local disk, NAS, mounted storage, or Tailscale shares.
+3. Self-generated annotations: local frame exports, detections, low-confidence review queues, corrected labels, crop sheets, and local annotation configs.
+
 ## Current pipeline commands
 
 Install locally:
@@ -38,11 +46,25 @@ soccer-edge ingest write-processed --source examples/metrica --source-type metri
 soccer-edge ingest write-processed --source examples/soccernet --source-type soccernet --output-dir data/processed/examples/ingest
 ```
 
-Build model inputs:
+Run the frame/detection review path:
 
 ```bash
-soccer-edge features inplay --source data/processed/game_state.csv --output data/processed/inplay_features.parquet --columns speed,pressure --window-seconds 60
-soccer-edge features tensor-samples --source examples/tiny_grid_features.csv --output data/processed/examples/tiny_tensor_samples.npz --columns g0,g1,g2,g3 --label label --channels 1 --height 2 --width 2 --sequence-length 2 --group match_id --order timestamp_seconds
+soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
+soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
+soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
+soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
+soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
+soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
+```
+
+Run calibration and annotation prep:
+
+```bash
+soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
+soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
+soccer-edge video export-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
+soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
 ```
 
 Train and review:
@@ -50,74 +72,10 @@ Train and review:
 ```bash
 soccer-edge train simple --source examples/tiny_training.csv --columns speed_last,pressure_last --label label --output-dir data/processed/examples/simple_model
 soccer-edge model predict --bundle-dir data/processed/examples/simple_model --source examples/tiny_training.csv --output data/processed/examples/predictions.csv
-soccer-edge model registry --root-dir data/processed/examples --output data/processed/examples/registry.csv
-soccer-edge model registry-summary --root-dir data/processed/examples --output data/processed/examples/registry_summary.csv
-soccer-edge model compare --registry data/processed/examples/registry_summary.csv --output data/processed/examples/comparison.csv
-soccer-edge model compare-markdown --comparison data/processed/examples/comparison.csv --output data/processed/examples/comparison.md
 soccer-edge model run-summary --registry data/processed/examples/registry_summary.csv --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/run_summary
 soccer-edge model model-card --bundle-dir data/processed/examples/simple_model --output data/processed/examples/MODEL_CARD.md
 soccer-edge model data-card --dataset-name local-example --sources examples/tiny_training.csv,examples/tiny_grid_features.csv --output data/processed/examples/DATA_CARD.md --rights-status owned
 soccer-edge model validate-cards --model-card-path data/processed/examples/MODEL_CARD.md --data-card-path data/processed/examples/DATA_CARD.md
-soccer-edge model calibration-review --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/calibration_review
-```
-
-Run the tiny local smoke pipeline:
-
-```bash
-soccer-edge examples tiny --repo-root . --output-dir data/processed/examples/tiny_pipeline
-```
-
-## Raw footage collection workflow
-
-The agent may organize local footage, but must not fetch audiovisual files from the public internet.
-
-1. Search approved local roots provided by the user, such as `/mnt`, `/media`, `/data`, or Tailscale-mounted shares.
-2. Copy or reference only files that the user owns or has licensed for processing.
-3. Create or update a video manifest with columns: `video_id`, `match_id`, `clip_type`, `local_path`, `rights_status`, `notes`.
-4. Catalog approved footage and plan processable rows:
-
-```bash
-soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned
-soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
-```
-
-5. Export frame images, run calibration QA, then process local footage:
-
-```bash
-soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
-soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
-soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
-```
-
-6. Export annotations, review low-confidence rows, export crops, and build a contact sheet:
-
-```bash
-soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
-soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
-soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
-soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
-```
-
-7. Write an annotation dataset config and train the optional local object model only after annotation data and rights status are recorded:
-
-```bash
-soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
-soccer-edge train object-model --data-config data/processed/annotations/data.yaml --base-model models/local-object-model.pt --output-dir data/processed/object_training --run-name local_object_model --epochs 50 --image-size 640
-```
-
-## Local training chain
-
-The local chain is a first automation target for agents. It catalogs local footage, builds tensor samples, trains a simple model, exports predictions, writes run summaries, and creates model/data cards.
-
-```bash
-soccer-edge train local-chain \
-  --footage-root data/raw/video_licensed \
-  --tabular-source examples/tiny_training.csv \
-  --grid-source examples/tiny_grid_features.csv \
-  --output-dir data/processed/local_training_chain \
-  --tabular-columns speed_last,pressure_last \
-  --grid-columns g0,g1,g2,g3 \
-  --order timestamp_seconds
 ```
 
 ## Fine-tuning pipeline target
@@ -125,22 +83,23 @@ soccer-edge train local-chain \
 The agent should prepare data for model fine-tuning in this order:
 
 1. Ingest local/open event data into processed Parquet tables.
-2. Process approved local footage into detections/tracks/state tables.
-3. Convert pixel-space detections to pitch-space state when calibration is available.
-4. Build rolling feature tables and preserve source metadata.
-5. Build tensor samples grouped by `match_id` and ordered by `timestamp_seconds` or `frame_idx`.
-6. Export normalized annotations, low-confidence review queues, object crops, and contact sheets for local object-model improvement.
-7. Train baseline tabular models, CNN tensor models, and optional local object models.
-8. Export predictions, calibration reports, registry summaries, cards, and markdown comparison reports.
-9. Promote only model bundles with reproducible metadata, feature names, metrics, cards, and lineage.
+2. Catalog approved local footage and export frame manifests.
+3. Process approved local footage into detections/tracks/state tables.
+4. Join detection rows to frame image paths by `frame_idx`.
+5. Convert pixel-space detections to pitch-space state when calibration is available.
+6. Build rolling feature tables and preserve source metadata.
+7. Export normalized annotations, train/validation splits, low-confidence review queues, object crops, and contact sheets.
+8. Train baseline tabular models, CNN tensor models, and optional local object models.
+9. Export predictions, calibration reports, registry summaries, cards, and markdown comparison reports.
+10. Promote only model bundles with reproducible metadata, feature names, metrics, cards, and lineage.
 
 ## Suggested next implementation tasks
 
-1. Add frame/detection join helper to attach `image_path` to detection rows by `frame_idx`.
-2. Add annotation train/val splitter for exported frames and labels.
-3. Add QA summary markdown for calibration error statistics.
-4. Add CI smoke test for example video-review commands.
-5. Add richer examples with real tiny local image fixtures when binary fixtures are allowed.
+1. Add annotation label audit summaries by class, frame, and split.
+2. Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
+3. Add automatic data-card population from training source catalog plus manifest stats.
+4. Add object-model evaluation ingest for precision/recall by class.
+5. Add a full local fine-tuning pipeline command that chains frame export -> detection -> join -> review -> split -> config -> train.
 
 ## Quality gates
 
