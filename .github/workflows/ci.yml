@@ -25,6 +25,8 @@ jobs:
         run: pytest tests/test_card_validation.py tests/test_cards.py
       - name: Video review smoke tests
         run: pytest tests/test_cli_next_video_tools.py tests/test_cli_data_integrations.py tests/test_frame_join.py tests/test_annotation_split.py tests/test_calibration_summary.py
+      - name: Final data integration smoke tests
+        run: pytest tests/test_annotation_audit.py tests/test_dataset_versioning.py tests/test_auto_data_card.py tests/test_object_eval.py tests/test_local_finetune_pipeline.py tests/test_cli_final_integrations.py
       - name: Run ruff
         run: ruff check src tests
 
