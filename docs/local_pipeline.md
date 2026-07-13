@@ -34,9 +34,12 @@ soccer-edge video catalog-local --root data/raw/video_licensed --output manifest
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
 soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
 soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
+soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
-soccer-edge video export-annotations --source data/processed/video_model/detections.parquet --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
-soccer-edge video sample-low-confidence --source data/processed/video_model/detections.parquet --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
+soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
+soccer-edge video export-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
+soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
 ```
