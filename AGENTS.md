@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build and operate the local soccer analytics pipeline for research, feature generation, model training, and model review. The agent should prioritize a rights-safe, reproducible workflow that turns approved local footage and open soccer data into structured tables, tensor samples, model bundles, predictions, and calibration reports.
+Build and operate the local soccer analytics pipeline for research, feature generation, model training, and model review. The agent should prioritize a rights-safe, reproducible workflow that turns approved local footage and open soccer data into structured tables, tensor samples, model bundles, predictions, calibration reports, data cards, and review artifacts.
 
 ## Hard safety and data rules
 
@@ -52,6 +52,9 @@ Run the frame/detection review path:
 soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
 soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
 soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
+soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video audit-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotation_audit
+soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
@@ -63,19 +66,28 @@ Run calibration and annotation prep:
 soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
 soccer-edge video export-annotations --source data/processed/detections_with_images.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
-soccer-edge video split-annotations --source data/processed/detections_with_images.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
 soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
 ```
 
-Train and review:
+Generate dataset metadata and evaluate object detections:
 
 ```bash
-soccer-edge train simple --source examples/tiny_training.csv --columns speed_last,pressure_last --label label --output-dir data/processed/examples/simple_model
-soccer-edge model predict --bundle-dir data/processed/examples/simple_model --source examples/tiny_training.csv --output data/processed/examples/predictions.csv
-soccer-edge model run-summary --registry data/processed/examples/registry_summary.csv --predictions data/processed/examples/predictions.csv --output-dir data/processed/examples/run_summary
-soccer-edge model model-card --bundle-dir data/processed/examples/simple_model --output data/processed/examples/MODEL_CARD.md
-soccer-edge model data-card --dataset-name local-example --sources examples/tiny_training.csv,examples/tiny_grid_features.csv --output data/processed/examples/DATA_CARD.md --rights-status owned
-soccer-edge model validate-cards --model-card-path data/processed/examples/MODEL_CARD.md --data-card-path data/processed/examples/DATA_CARD.md
+soccer-edge model source-catalog --output data/processed/training_sources.csv
+soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/detections_with_images.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md
+soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
+```
+
+Run the full local fine-tuning path when optional media/object-model dependencies are installed:
+
+```bash
+soccer-edge train local-finetune \
+  --input data/raw/video_licensed/clip.mp4 \
+  --object-model-path models/local-object-model.pt \
+  --output-dir data/processed/local_finetune \
+  --classes player,ball \
+  --calibration-path configs/pitch_calibration.json \
+  --stride 5 \
+  --max-frames 100
 ```
 
 ## Fine-tuning pipeline target
@@ -87,19 +99,20 @@ The agent should prepare data for model fine-tuning in this order:
 3. Process approved local footage into detections/tracks/state tables.
 4. Join detection rows to frame image paths by `frame_idx`.
 5. Convert pixel-space detections to pitch-space state when calibration is available.
-6. Build rolling feature tables and preserve source metadata.
-7. Export normalized annotations, train/validation splits, low-confidence review queues, object crops, and contact sheets.
-8. Train baseline tabular models, CNN tensor models, and optional local object models.
-9. Export predictions, calibration reports, registry summaries, cards, and markdown comparison reports.
-10. Promote only model bundles with reproducible metadata, feature names, metrics, cards, and lineage.
+6. Split annotation rows without leaking frame groups across train/validation outputs.
+7. Build audits, dataset versions, source catalogs, and automatic data cards.
+8. Export normalized annotations, low-confidence review queues, object crops, and contact sheets.
+9. Train baseline tabular models, CNN tensor models, and optional local object models.
+10. Export predictions, object evaluation metrics, calibration reports, registry summaries, cards, and markdown comparison reports.
+11. Promote only model bundles with reproducible metadata, feature names, metrics, cards, versions, and lineage.
 
 ## Suggested next implementation tasks
 
-1. Add annotation label audit summaries by class, frame, and split.
-2. Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
-3. Add automatic data-card population from training source catalog plus manifest stats.
-4. Add object-model evaluation ingest for precision/recall by class.
-5. Add a full local fine-tuning pipeline command that chains frame export -> detection -> join -> review -> split -> config -> train.
+1. Add dataset version IDs into data-card and model-card metadata.
+2. Add automatic correction merge helpers for reviewed low-confidence crops.
+3. Add object-model evaluation visual confusion matrix output.
+4. Add local fine-tune dry-run mode that writes a runnable shell plan without executing optional dependencies.
+5. Add Neo4j graph export payloads for dataset versions, annotation audits, and model evaluation summaries.
 
 ## Quality gates
 
