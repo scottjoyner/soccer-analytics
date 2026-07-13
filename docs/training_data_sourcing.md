@@ -54,12 +54,24 @@ soccer-edge video export-crops --source data/processed/low_confidence.csv --outp
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
 ```
 
-Human review should promote corrected rows back into the annotation set. The corrected annotations can then be exported and split:
+Human review should promote corrected rows back into the annotation set. The corrected annotations can then be exported, split, audited, and versioned:
 
 ```bash
 soccer-edge video export-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
 soccer-edge video split-annotations --source data/processed/corrected_detections.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
+soccer-edge video audit-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotation_audit
+soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
+```
+
+### Tier 4 — Evaluation and promotion metadata
+
+Before promoting a fine-tuned dataset or model, generate a source catalog, automatic data card, and class-level object metrics.
+
+```bash
+soccer-edge model source-catalog --output data/processed/training_sources.csv
+soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md
+soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
 ```
 
 ## Training-data priorities
@@ -68,7 +80,22 @@ soccer-edge video annotation-config --root data/processed/annotations --train-im
 2. **State and tracking model**: use Metrica tracking data to validate pitch-space state features and rolling-window table generation.
 3. **Broadcast/video model**: use SoccerNet only after confirming access terms for the specific task/subset.
 4. **Local object model**: use owned/licensed local footage, exported frames, detection review queues, and corrected annotations.
-5. **Fine-tuning bundle**: promote only datasets with data cards, source manifests, rights status, feature lineage, model cards, and calibration reports.
+5. **Fine-tuning bundle**: promote only datasets with data cards, source manifests, rights status, feature lineage, model cards, dataset versions, audits, and calibration reports.
+
+## Full local fine-tuning command
+
+When optional media and local object-model dependencies are installed, the command below chains frame export, local object-model detections, image-path joins, low-confidence review, crops, annotations, train/validation split, annotation config, automatic data card, and optional object-model training.
+
+```bash
+soccer-edge train local-finetune \
+  --input data/raw/video_licensed/clip.mp4 \
+  --object-model-path models/local-object-model.pt \
+  --output-dir data/processed/local_finetune \
+  --classes player,ball \
+  --calibration-path configs/pitch_calibration.json \
+  --stride 5 \
+  --max-frames 100
+```
 
 ## Minimum dataset card checklist
 
@@ -84,6 +111,8 @@ Every training dataset should have:
 - Train/validation split method.
 - Known bias or quality issues.
 - Link to calibration QA artifacts when pitch-space labels are used.
+- Dataset asset hashes.
+- Annotation audit summaries.
 
 ## Label taxonomy
 
@@ -116,6 +145,8 @@ Run these before model training:
 soccer-edge model validate-cards --data-card-path data/processed/DATA_CARD.md
 soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
+soccer-edge video audit-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotation_audit
+soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 pytest
 ruff check src tests
 ```
@@ -125,4 +156,4 @@ ruff check src tests
 - Do not download match videos from public platforms for training.
 - Do not silently process footage with `pending`, `unknown`, or missing rights status.
 - Do not mix train and validation labels from the same frame group unless explicitly testing leakage.
-- Do not promote a model without data cards, model cards, and calibration/evaluation artifacts.
+- Do not promote a model without data cards, model cards, dataset versions, audits, and calibration/evaluation artifacts.
