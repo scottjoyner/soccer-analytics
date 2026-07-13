@@ -81,10 +81,13 @@
 - [x] Add QA summary markdown for calibration error statistics.
 - [x] Add annotation export format for local object model fine-tuning.
 - [x] Add annotation train/val splitter for exported frames and labels.
+- [x] Add annotation label audit summaries by class, frame, and split.
 - [x] Add annotation dataset config writer for local object-model training.
 - [x] Add active learning sampling for low-confidence frames.
 - [x] Add object crop export for low-confidence review rows.
 - [x] Add crop-review HTML contact sheet generation.
+- [x] Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
+- [x] Add automatic data-card population from training source catalog plus manifest stats.
 - [x] Add richer examples with tiny local image fixtures.
 
 ## Phase 6 — CV feature generation
@@ -136,6 +139,7 @@
 - [x] Add run summary writer for comparison, markdown, and calibration artifacts.
 - [x] Add model/data cards for promoted fine-tuned bundles.
 - [x] Add full object-model training command behind optional dependency gates.
+- [x] Add object-model evaluation ingest for precision/recall by class.
 
 ## Phase 9 — Offline evaluation
 
@@ -157,6 +161,7 @@
 - [x] Add simple training command.
 - [x] Add CNN training command.
 - [x] Add local training chain command.
+- [x] Add local fine-tuning pipeline command.
 - [x] Add object model training command.
 - [x] Add model bundle save command.
 - [x] Add model prediction command.
@@ -167,13 +172,16 @@
 - [x] Add model compare markdown command.
 - [x] Add model run summary command.
 - [x] Add model/data card commands.
+- [x] Add automatic data-card command.
 - [x] Add model/data card validation command.
 - [x] Add model evaluate command.
 - [x] Add model calibration review command.
 - [x] Add CNN calibration review command.
+- [x] Add object-model evaluation command.
+- [x] Add source catalog command.
 - [x] Add local footage catalog command.
 - [x] Add local object model video process command.
-- [x] Add frame export, frame image join, annotation export/split, low-confidence sampling, crop export, contact sheet, calibration QA/summary, and annotation-config commands.
+- [x] Add frame export, frame image join, annotation export/split/audit, dataset versions, low-confidence sampling, crop export, contact sheet, calibration QA/summary, and annotation-config commands.
 - [x] Add CLI command to run the full tiny example pipeline end to end.
 - [x] Add end-to-end sample workflow fixture.
 - [x] Add examples directory with tiny CSV fixtures and NPZ generation command.
@@ -183,8 +191,8 @@
 
 ## Immediate next commits
 
-1. Add annotation label audit summaries by class, frame, and split.
-2. Add dataset versioning/hashing for frame manifests, annotation tables, and data cards.
-3. Add automatic data-card population from training source catalog plus manifest stats.
-4. Add object-model evaluation ingest for precision/recall by class.
-5. Add a full local fine-tuning pipeline command that chains frame export -> detection -> join -> review -> split -> config -> train.
+1. Add dataset version IDs into data-card and model-card metadata.
+2. Add automatic correction merge helpers for reviewed low-confidence crops.
+3. Add object-model evaluation visual confusion matrix output.
+4. Add local fine-tune dry-run mode that writes a runnable shell plan without executing optional dependencies.
+5. Add Neo4j graph export payloads for dataset versions, annotation audits, and model evaluation summaries.
