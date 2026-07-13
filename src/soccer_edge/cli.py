@@ -7,10 +7,12 @@ import typer
 from rich.console import Console
 
 from soccer_edge.active_sampling import write_low_confidence_rows
+from soccer_edge.annotation_audit import write_annotation_audit
 from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
 from soccer_edge.annotation_split import write_annotation_split
 from soccer_edge.annotations import write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
+from soccer_edge.auto_data_card import write_auto_data_card
 from soccer_edge.calibration_qa import write_projection_qa_csv, write_projection_qa_svg
 from soccer_edge.calibration_summary import write_calibration_summary
 from soccer_edge.card_validation import assert_valid_cards
@@ -18,6 +20,7 @@ from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
 from soccer_edge.contact_sheet import write_contact_sheet
 from soccer_edge.crop_export import export_image_crops_from_table
+from soccer_edge.dataset_versioning import write_dataset_versions
 from soccer_edge.evaluation.calibration_review import write_calibration_review
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
@@ -29,6 +32,7 @@ from soccer_edge.ingest.processed_tables import write_metrica_processed, write_s
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.local_finetune_pipeline import run_local_finetune_pipeline
 from soccer_edge.local_training_chain import run_local_training_chain
 from soccer_edge.media_inference import make_media_callback
 from soccer_edge.media_pipeline import run_media_table_stub
@@ -44,8 +48,10 @@ from soccer_edge.models.registry import write_registry_index, write_registry_sum
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
+from soccer_edge.object_eval import write_object_eval_metrics
 from soccer_edge.object_model import LocalObjectRunner
 from soccer_edge.object_training import ObjectTrainingConfig, run_object_training
+from soccer_edge.training_sources import write_training_sources
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.calibration_io import load_homography
 from soccer_edge.video.local_catalog import write_local_video_catalog
@@ -223,6 +229,32 @@ def attach_frame_images(
     """Attach exported frame image paths to detection rows by frame index."""
 
     path = attach_image_paths_from_tables(detections, frame_manifest, output, frame_column=frame_column, image_path_column=image_path_column)
+    console.print(f"wrote={path}")
+
+
+@video_app.command("audit-annotations")
+def audit_annotations(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/annotation_audit")),
+    class_column: str = typer.Option("class_name"),
+    frame_column: str = typer.Option("frame_idx"),
+    split_column: str = typer.Option("split"),
+) -> None:
+    """Write annotation label audit summaries by class, frame, and split."""
+
+    paths = write_annotation_audit(source, output_dir, class_column=class_column, frame_column=frame_column, split_column=split_column)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@video_app.command("dataset-versions")
+def dataset_versions_command(
+    paths: str = typer.Option(..., help="Comma-separated local file paths to version."),
+    output: Path = typer.Option(Path("data/processed/dataset_versions.csv")),
+) -> None:
+    """Write deterministic file hashes and table shapes for dataset assets."""
+
+    selected = [Path(item.strip()) for item in paths.split(",") if item.strip()]
+    path = write_dataset_versions(selected, output)
     console.print(f"wrote={path}")
 
 
@@ -474,6 +506,39 @@ def train_local_chain(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@train_app.command("local-finetune")
+def train_local_finetune(
+    input_path: Path = typer.Option(..., "--input", exists=True),
+    object_model_path: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/local_finetune")),
+    classes: str = typer.Option("player,ball"),
+    base_model_path: Path | None = typer.Option(None, exists=False),
+    calibration_path: Path | None = typer.Option(None, exists=False),
+    stride: int = typer.Option(5),
+    max_frames: int | None = typer.Option(100),
+    train_fraction: float = typer.Option(0.8),
+    threshold: float = typer.Option(0.5),
+    train_object_model: bool = typer.Option(False),
+) -> None:
+    """Run the local fine-tuning path from frames through optional object training."""
+
+    class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
+    outputs = run_local_finetune_pipeline(
+        input_path=input_path,
+        object_model_path=object_model_path,
+        output_dir=output_dir,
+        classes=class_names,
+        base_model_path=base_model_path,
+        calibration_path=calibration_path,
+        stride=stride,
+        max_frames=max_frames,
+        train_fraction=train_fraction,
+        threshold=threshold,
+        train_object_model=train_object_model,
+    )
+    console.print({name: str(path) if path is not None else None for name, path in outputs.__dict__.items()})
+
+
 @train_app.command("object-model")
 def train_object_model(
     data_config: Path = typer.Option(..., exists=True),
@@ -628,6 +693,43 @@ def data_card(
 
     source_paths = [Path(source.strip()) for source in sources.split(",") if source.strip()]
     path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("auto-data-card")
+def auto_data_card(
+    dataset_name: str = typer.Option(...),
+    manifests: str = typer.Option(..., help="Comma-separated manifest/table paths."),
+    output: Path = typer.Option(Path("DATA_CARD.md")),
+    rights_status: str = typer.Option("owned"),
+    version_paths: str | None = typer.Option(None, help="Optional comma-separated paths to hash."),
+) -> None:
+    """Write a data card populated from source catalog and manifest stats."""
+
+    manifest_paths = [Path(item.strip()) for item in manifests.split(",") if item.strip()]
+    version_selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
+    path = write_auto_data_card(dataset_name, manifest_paths, output, rights_status=rights_status, version_paths=version_selected)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("source-catalog")
+def source_catalog(output: Path = typer.Option(Path("data/processed/training_sources.csv"))) -> None:
+    """Write the default rights-aware training source catalog."""
+
+    path = write_training_sources(output)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("object-eval")
+def object_eval(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/object_eval.csv")),
+    class_column: str = typer.Option("class_name"),
+    status_column: str = typer.Option("status"),
+) -> None:
+    """Write object-model precision, recall, and F1 by class."""
+
+    path = write_object_eval_metrics(source, output, class_column=class_column, status_column=status_column)
     console.print(f"wrote={path}")
 
 
