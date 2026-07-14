@@ -3,8 +3,11 @@
 Use these commands after installing the package in editable mode.
 
 ```bash
+soccer-edge ingest raw-sources --output data/processed/raw_data_sources.csv
 soccer-edge ingest write-processed --source data/raw/metrica --source-type metrica --output-dir data/processed/ingest
 soccer-edge features inplay --source data/processed/game_state.csv --output data/processed/inplay_features.parquet --columns speed,pressure --window-seconds 60
+soccer-edge features player-stats --events data/processed/ingest/events.parquet --output data/processed/player_match_stats.csv
+soccer-edge features player-form --player-stats data/processed/player_match_stats.csv --output data/processed/player_form.csv --window 5 --order-column match_id
 soccer-edge train simple --source data/processed/inplay_features.parquet --columns speed_last,pressure_last --label label --output-dir data/processed/simple_model
 soccer-edge model predict --bundle-dir data/processed/simple_model --source data/processed/inplay_features.parquet --output data/processed/predictions.csv
 soccer-edge model registry --root-dir data/processed --output data/processed/model_registry.csv
@@ -12,8 +15,8 @@ soccer-edge model registry-summary --root-dir data/processed --output data/proce
 soccer-edge model compare --registry data/processed/model_registry_summary.csv --output data/processed/model_comparison.csv
 soccer-edge model compare-markdown --comparison data/processed/model_comparison.csv --output data/processed/model_comparison.md
 soccer-edge model run-summary --registry data/processed/model_registry_summary.csv --predictions data/processed/predictions.csv --output-dir data/processed/run_summary
-soccer-edge model model-card --bundle-dir data/processed/simple_model --output data/processed/MODEL_CARD.md --version-paths data/processed/inplay_features.parquet
-soccer-edge model data-card --dataset-name local-dataset --sources data/raw/video_licensed,data/processed/inplay_features.parquet --output data/processed/DATA_CARD.md --rights-status owned --version-paths data/processed/inplay_features.parquet
+soccer-edge model model-card --bundle-dir data/processed/simple_model --output data/processed/MODEL_CARD.md --version-paths data/processed/inplay_features.parquet --graph-ids ModelRun::simple
+soccer-edge model data-card --dataset-name local-dataset --sources data/raw/video_licensed,data/processed/inplay_features.parquet --output data/processed/DATA_CARD.md --rights-status owned --version-paths data/processed/inplay_features.parquet --graph-ids DatasetVersion::local-dataset
 soccer-edge model validate-cards --model-card-path data/processed/MODEL_CARD.md --data-card-path data/processed/DATA_CARD.md
 soccer-edge model calibration-review --predictions data/processed/predictions.csv --output-dir data/processed/calibration_review
 ```
@@ -40,6 +43,7 @@ soccer-edge video attach-frame-images --detections data/processed/video_model/de
 soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
 soccer-edge video contact-sheet --source data/processed/crop_manifest.csv --output data/processed/crop_review.html
+soccer-edge video correction-review --source data/processed/crop_manifest.csv --html-output data/processed/correction_review.html --template-output data/processed/reviewed_corrections.csv --keys crop_path
 soccer-edge video merge-corrections --base data/processed/detections_with_images.csv --corrections data/processed/reviewed_corrections.csv --output data/processed/corrected_detections.csv --keys crop_path
 soccer-edge video export-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
 soccer-edge video split-annotations --source data/processed/corrected_detections.csv --train-output data/processed/annotations/train.csv --val-output data/processed/annotations/val.csv --train-fraction 0.8
@@ -47,13 +51,17 @@ soccer-edge video audit-annotations --source data/processed/corrected_detections
 soccer-edge video dataset-versions --paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv --output data/processed/dataset_versions.csv
 ```
 
-Object-model evaluation and data-card generation:
+Object-model evaluation, graph export, and promotion checks:
 
 ```bash
 soccer-edge model source-catalog --output data/processed/training_sources.csv
 soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
 soccer-edge model object-confusion --source data/processed/object_eval_rows.csv --table-output data/processed/object_confusion.csv --svg-output data/processed/object_confusion.svg
+soccer-edge model graph-payloads --source data/processed/dataset_versions.csv --output data/processed/dataset_version_payloads.jsonl --kind dataset-version
+soccer-edge model graph-audit-payloads --audit-dir data/processed/annotation_audit --output data/processed/annotation_audit_payloads.jsonl
+soccer-edge model graph-payloads --source data/processed/object_eval.csv --output data/processed/object_eval_payloads.jsonl --kind object-evaluation
 soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md --version-paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv
+soccer-edge model promotion-gate --model-card-path data/processed/MODEL_CARD.md --data-card-path data/processed/DATA_CARD.md --dataset-versions data/processed/dataset_versions.csv --audit-dir data/processed/annotation_audit --object-metrics data/processed/object_eval.csv --output data/processed/promotion_gate.md --min-f1 0.1
 ```
 
 Optional local object-model training uses the annotation config and runs through the optional ML dependency stack.
@@ -85,7 +93,8 @@ soccer-edge train local-finetune \
   --output-dir data/processed/local_finetune \
   --classes player,ball \
   --calibration-path configs/pitch_calibration.json \
-  --dry-run-plan data/processed/local_finetune/plan.sh
+  --dry-run-plan data/processed/local_finetune/plan.sh \
+  --validate-plan-inputs
 ```
 
 Run the local chain from approved footage plus existing tabular/grid feature files:
