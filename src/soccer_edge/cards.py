@@ -12,6 +12,12 @@ def resolved_dataset_version_id(dataset_id: str | None = None, version_paths: li
     return None
 
 
+def graph_links_section(graph_ids: list[str] | None = None) -> list[str]:
+    if not graph_ids:
+        return []
+    return ["", "## Graph payload IDs", "\n".join(f"- {graph_id}" for graph_id in graph_ids)]
+
+
 def write_model_card(
     bundle_dir: Path,
     output_path: Path,
@@ -19,6 +25,7 @@ def write_model_card(
     limitations: str = "Not for real-money execution or guaranteed outcome prediction.",
     dataset_id: str | None = None,
     version_paths: list[Path] | None = None,
+    graph_ids: list[str] | None = None,
 ) -> Path:
     metadata = read_run_metadata(bundle_dir / "metadata.json")
     version_id = resolved_dataset_version_id(dataset_id, version_paths)
@@ -30,6 +37,7 @@ def write_model_card(
     ]
     if version_id is not None:
         lines.append(f"Dataset version ID: {version_id}")
+    lines.extend(graph_links_section(graph_ids))
     lines.extend(
         [
             "",
@@ -63,6 +71,7 @@ def write_data_card(
     lineage_note: str = "Generated from approved local or open sources.",
     dataset_id: str | None = None,
     version_paths: list[Path] | None = None,
+    graph_ids: list[str] | None = None,
 ) -> Path:
     version_id = resolved_dataset_version_id(dataset_id, version_paths)
     lines = [
@@ -72,6 +81,7 @@ def write_data_card(
     ]
     if version_id is not None:
         lines.append(f"Dataset version ID: {version_id}")
+    lines.extend(graph_links_section(graph_ids))
     lines.extend(
         [
             "",
