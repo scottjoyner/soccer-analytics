@@ -9,6 +9,8 @@ def attach_image_paths(
     frame_column: str = "frame_idx",
     image_path_column: str = "image_path",
 ) -> pd.DataFrame:
+    if detections.empty:
+        return pd.DataFrame(columns=[frame_column, image_path_column])
     if frame_column not in detections.columns:
         raise ValueError(f"detections missing frame column: {frame_column}")
     if frame_column not in frame_manifest.columns:

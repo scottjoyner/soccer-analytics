@@ -46,6 +46,8 @@ def test_train_local_chain_command(tmp_path) -> None:
             "g0,g1,g2,g3",
             "--order",
             "timestamp_seconds",
+            "--rights-reference",
+            "personal-recording://self",
         ],
     )
     assert result.exit_code == 0

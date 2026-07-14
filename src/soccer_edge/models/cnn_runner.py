@@ -6,6 +6,7 @@ from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.cnn import FieldStateCNN
 from soccer_edge.models.cnn_training import train_field_state_cnn
 from soccer_edge.models.dataset import RollingGameStateDataset, RollingGameStateSample
+from soccer_edge.models.device import resolve_device
 from soccer_edge.models.game_state import GameStateTrainingConfig
 from soccer_edge.models.torch_optional import require_torch, torch
 
@@ -34,8 +35,10 @@ def train_cnn_from_npz(
     epochs: int = 1,
     batch_size: int = 4,
     hidden_size: int = 128,
+    device: str | None = None,
 ) -> dict[str, Path]:
     require_torch()
+    device = resolve_device(device)
     samples = load_tensor_samples(npz_path)
     if not samples:
         raise ValueError("no samples found")
@@ -44,6 +47,6 @@ def train_cnn_from_npz(
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
     model = FieldStateCNN(in_channels=channels, output_classes=output_classes, hidden_size=hidden_size)
     config = GameStateTrainingConfig(epochs=epochs, batch_size=batch_size, hidden_size=hidden_size)
-    history = train_field_state_cnn(model, dataloader, config)
+    history = train_field_state_cnn(model, dataloader, config, device=device)
     metrics = {"final_loss": float(history.losses[-1]) if history.losses else 0.0, "batches_seen": float(history.batches_seen)}
     return save_bundle(model, output_dir, "field_state_cnn", "v0", ["spatial_grid"], metrics)

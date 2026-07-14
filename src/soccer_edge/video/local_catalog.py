@@ -15,12 +15,23 @@ class LocalVideoCatalogRow:
     clip_type: str
     local_path: str
     rights_status: str
+    rights_reference: str = ""
     notes: str = ""
 
 
-def discover_local_videos(root: Path, rights_status: str = "owned", clip_type: str = "full_match") -> list[LocalVideoCatalogRow]:
+def discover_local_videos(
+    root: Path,
+    rights_status: str = "owned",
+    clip_type: str = "full_match",
+    rights_reference: str = "",
+) -> list[LocalVideoCatalogRow]:
     if rights_status not in PROCESSABLE_RIGHTS:
         raise ValueError(f"rights_status must be one of {sorted(PROCESSABLE_RIGHTS)}")
+    if rights_status in PROCESSABLE_RIGHTS and not rights_reference:
+        raise ValueError(
+            f"rights_status={rights_status!r} requires a recorded rights_reference "
+            "(explicit written rights) before the footage may be used."
+        )
     rows: list[LocalVideoCatalogRow] = []
     for path in sorted(root.rglob("*")):
         if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
@@ -32,6 +43,7 @@ def discover_local_videos(root: Path, rights_status: str = "owned", clip_type: s
                     clip_type=clip_type,
                     local_path=str(path),
                     rights_status=rights_status,
+                    rights_reference=rights_reference,
                     notes="local approved footage",
                 )
             )
@@ -43,8 +55,11 @@ def write_local_video_catalog(
     output: Path,
     rights_status: str = "owned",
     clip_type: str = "full_match",
+    rights_reference: str = "",
 ) -> Path:
-    rows = discover_local_videos(root=root, rights_status=rights_status, clip_type=clip_type)
+    rows = discover_local_videos(
+        root=root, rights_status=rights_status, clip_type=clip_type, rights_reference=rights_reference
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([asdict(row) for row in rows]).to_csv(output, index=False)
     return output

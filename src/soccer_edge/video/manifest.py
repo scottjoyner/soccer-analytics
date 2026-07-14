@@ -23,6 +23,7 @@ class VideoManifestRow:
     start_match_second: float | None
     end_match_second: float | None
     rights_status: str
+    rights_reference: str = ""
     notes: str = ""
 
     @property
@@ -61,13 +62,27 @@ def manifest_row_from_dict(row: dict[str, str]) -> VideoManifestRow:
         start_match_second=parse_optional_float(row.get("start_match_second")),
         end_match_second=parse_optional_float(row.get("end_match_second")),
         rights_status=row.get("rights_status", "pending"),
+        rights_reference=row.get("rights_reference", ""),
         notes=row.get("notes", ""),
     )
+
+
+def find_manifest_row(manifest_path: Path, video_id: str) -> VideoManifestRow | None:
+    for row in read_video_manifest(manifest_path):
+        if row.video_id == video_id:
+            return row
+    return None
 
 
 def validate_processable_video(row: VideoManifestRow, licensed_root: Path) -> None:
     if not row.is_processable:
         raise ValueError(f"Video {row.video_id} is not processable: rights_status={row.rights_status}")
+
+    if not row.rights_reference:
+        raise ValueError(
+            f"Video {row.video_id} is missing a recorded rights_reference; "
+            "explicit written rights must be recorded before processing."
+        )
 
     root = licensed_root.resolve()
     local_path = row.local_path.resolve()

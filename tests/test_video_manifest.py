@@ -26,9 +26,24 @@ def test_manifest_row_licensed_inside_root_is_processable() -> None:
             "clip_type": "full_match",
             "local_path": "data/raw/video_licensed/world_cup/full_matches/clip_2.mp4",
             "rights_status": "licensed",
+            "rights_reference": "license-file:///perms/wc2026.pdf",
         }
     )
     validate_processable_video(row, Path("data/raw/video_licensed"))
+
+
+def test_manifest_row_processable_without_rights_reference_is_rejected() -> None:
+    row = manifest_row_from_dict(
+        {
+            "video_id": "clip_2b",
+            "match_id": "match_2b",
+            "clip_type": "full_match",
+            "local_path": "data/raw/video_licensed/world_cup/full_matches/clip_2b.mp4",
+            "rights_status": "licensed",
+        }
+    )
+    with pytest.raises(ValueError):
+        validate_processable_video(row, Path("data/raw/video_licensed"))
 
 
 def test_manifest_row_outside_root_is_rejected() -> None:

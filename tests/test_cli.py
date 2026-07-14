@@ -54,8 +54,8 @@ def test_video_plan_command(tmp_path) -> None:
     clip_path.touch()
     manifest = tmp_path / "manifest.csv"
     manifest.write_text(
-        "video_id,match_id,clip_type,local_path,rights_status\n"
-        f"clip,match,full_match,{clip_path},licensed\n",
+        "video_id,match_id,clip_type,local_path,rights_status,rights_reference\n"
+        f"clip,match,full_match,{clip_path},licensed,license-file:///perms/wc2026.pdf\n",
         encoding="utf-8",
     )
 
@@ -74,6 +74,134 @@ def test_video_process_command(tmp_path) -> None:
     result = runner.invoke(app, ["video", "process", "--input", str(clip), "--output-dir", str(output), "--frame-count", "1"])
     assert result.exit_code == 0
     assert (output / "detections.parquet").exists()
+
+
+def test_video_process_manifest_gate(tmp_path) -> None:
+    licensed_root = tmp_path / "licensed"
+    licensed_root.mkdir()
+    clip = licensed_root / "clip.mp4"
+    clip.write_bytes(b"demo")
+    output = tmp_path / "video_out"
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "video_id,match_id,clip_type,local_path,rights_status,rights_reference\n"
+        f"good,match,full_match,{clip},licensed,license-file:///perms/wc2026.pdf\n"
+        f"unproven,match,full_match,{clip},licensed,\n",
+        encoding="utf-8",
+    )
+
+    approved = runner.invoke(
+        app,
+        [
+            "video",
+            "process",
+            "--input",
+            str(clip),
+            "--output-dir",
+            str(output),
+            "--frame-count",
+            "1",
+            "--manifest",
+            str(manifest),
+            "--video-id",
+            "good",
+            "--licensed-root",
+            str(licensed_root),
+        ],
+    )
+    assert approved.exit_code == 0
+    assert (output / "detections.parquet").exists()
+
+    blocked = runner.invoke(
+        app,
+        [
+            "video",
+            "process",
+            "--input",
+            str(clip),
+            "--output-dir",
+            str(tmp_path / "blocked"),
+            "--frame-count",
+            "1",
+            "--manifest",
+            str(manifest),
+            "--video-id",
+            "unproven",
+            "--licensed-root",
+            str(licensed_root),
+        ],
+    )
+    assert blocked.exit_code != 0
+
+
+def test_train_local_finetune_manifest_gate(tmp_path) -> None:
+    licensed_root = tmp_path / "licensed"
+    licensed_root.mkdir()
+    clip = licensed_root / "clip.mp4"
+    clip.write_bytes(b"demo")
+    model = tmp_path / "model.pt"
+    model.write_bytes(b"demo")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "video_id,match_id,clip_type,local_path,rights_status,rights_reference\n"
+        f"unproven,match,full_match,{clip},licensed,\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "train",
+            "local-finetune",
+            "--input",
+            str(clip),
+            "--object-model-path",
+            str(model),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--manifest",
+            str(manifest),
+            "--video-id",
+            "unproven",
+            "--licensed-root",
+            str(licensed_root),
+        ],
+    )
+    assert result.exit_code != 0
+
+
+def test_train_player_ball_manifest_gate(tmp_path) -> None:
+    licensed_root = tmp_path / "licensed"
+    licensed_root.mkdir()
+    clip = licensed_root / "clip.mp4"
+    clip.write_bytes(b"demo")
+    base = tmp_path / "base.pt"
+    base.write_bytes(b"demo")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "video_id,match_id,clip_type,local_path,rights_status,rights_reference\n"
+        f"unproven,match,full_match,{clip},licensed,\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "train",
+            "player-ball",
+            "--input",
+            str(clip),
+            "--base-model",
+            str(base),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--manifest",
+            str(manifest),
+            "--video-id",
+            "unproven",
+            "--licensed-root",
+            str(licensed_root),
+        ],
+    )
+    assert result.exit_code != 0
 
 
 def test_features_build_command(tmp_path) -> None:

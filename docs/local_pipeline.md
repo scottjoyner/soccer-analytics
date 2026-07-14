@@ -30,15 +30,16 @@ soccer-edge model predict-cnn --bundle-dir data/processed/cnn_model --source dat
 soccer-edge model calibration-review-cnn --bundle-dir data/processed/cnn_model --source data/processed/tensor_samples.npz --output-dir data/processed/cnn_calibration_review
 ```
 
-Local media processing remains restricted to files you have rights to process. The media reader gate uses optional OpenCV support, and the media inference adapter converts local model outputs into table-ready rows.
+Local media processing remains restricted to files you have rights to process. The media reader gate uses optional OpenCV support, and the media inference adapter converts local model outputs into table-ready rows. Every command that opens raw footage (`export-frames`, `process`, `process-local-model`, `detect-yolo`, `train player-ball`, and `train local-finetune` run mode) enforces a rights gate: pass `--manifest` and `--video-id` pointing at an approved `catalog-local` row whose `rights_reference` is recorded and whose `local_path` matches the input. Omitting these flags keeps the legacy trust-local-file behavior.
 
 ```bash
-soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned
+soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned --rights-reference <written-rights-reference>
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root data/raw/video_licensed
-soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100
+soccer-edge video export-frames --input data/raw/video_licensed/clip.mp4 --output-dir data/processed/frames --manifest-output data/processed/frame_manifest.csv --stride 5 --max-frames 100 --manifest manifests/local_video_manifest.csv --video-id clip --licensed-root data/raw/video_licensed
 soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
-soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json
+soccer-edge video process-local-model --input data/raw/video_licensed/clip.mp4 --model-path models/local-object-model.pt --output-dir data/processed/video_model --stride 5 --max-samples 100 --calibration configs/pitch_calibration.json --manifest manifests/local_video_manifest.csv --video-id clip --licensed-root data/raw/video_licensed
+soccer-edge video detect-yolo --input data/raw/video_licensed/clip.mp4 --model-path models/yolov8n.pt --output-dir data/processed/video_yolo --stride 5 --max-frames 100 --manifest manifests/local_video_manifest.csv --video-id clip --licensed-root data/raw/video_licensed
 soccer-edge video attach-frame-images --detections data/processed/video_model/detections.parquet --frame-manifest data/processed/frame_manifest.csv --output data/processed/detections_with_images.csv
 soccer-edge video sample-low-confidence --source data/processed/detections_with_images.csv --output data/processed/low_confidence.csv --threshold 0.5 --limit 100
 soccer-edge video export-crops --source data/processed/low_confidence.csv --output-dir data/processed/crops --manifest-output data/processed/crop_manifest.csv --image-path-column image_path
@@ -81,7 +82,24 @@ soccer-edge train local-finetune \
   --classes player,ball \
   --calibration-path configs/pitch_calibration.json \
   --stride 5 \
-  --max-frames 100
+  --max-frames 100 \
+  --manifest manifests/local_video_manifest.csv \
+  --video-id clip \
+  --licensed-root data/raw/video_licensed
+```
+
+Fine-tune a player/ball detector directly on approved local footage:
+
+```bash
+soccer-edge train player-ball \
+  --input data/raw/video_licensed/clip.mp4 \
+  --base-model models/yolov8n.pt \
+  --output-dir data/processed/player_ball_finetune \
+  --stride 5 \
+  --max-frames 100 \
+  --manifest manifests/local_video_manifest.csv \
+  --video-id clip \
+  --licensed-root data/raw/video_licensed
 ```
 
 Dry-run the full fine-tuning path without invoking optional media/model dependencies:
@@ -107,7 +125,8 @@ soccer-edge train local-chain \
   --output-dir data/processed/local_training_chain \
   --tabular-columns speed_last,pressure_last \
   --grid-columns g0,g1,g2,g3 \
-  --order timestamp_seconds
+  --order timestamp_seconds \
+  --rights-reference <written-rights-reference>
 ```
 
 Run the tiny example pipeline:

@@ -47,7 +47,7 @@ def default_training_sources() -> list[TrainingSource]:
             modality="video,frames,crops,annotations",
             best_use="object detection, crop review, pitch calibration, local fine-tuning",
             rights_posture="process only with owned, licensed, or compatible_license manifest rows",
-            ingest_command="soccer-edge video catalog-local --root <footage-root> --output manifests/local_video_manifest.csv --rights-status owned",
+            ingest_command="soccer-edge video catalog-local --root <footage-root> --output manifests/local_video_manifest.csv --rights-status owned --rights-reference <written-rights-reference>",
         ),
     ]
 

@@ -25,7 +25,7 @@ def test_write_promotion_gate_report(tmp_path) -> None:
     output = tmp_path / "promotion.md"
     audit_dir.mkdir()
     model_card.write_text("# Model Card\n\n## Intended use\n\n## Features\n\n## Metrics\n\n## Limitations\n", encoding="utf-8")
-    data_card.write_text("# Data Card\n\n## Sources\n\n## Lineage\n\n## Allowed use\n\n## Restrictions\n", encoding="utf-8")
+    data_card.write_text("# Data Card\n\nRights status: compatible_license\n\n## Sources\n\n## Lineage\n\n## Allowed use\n\n## Restrictions\n", encoding="utf-8")
     pd.DataFrame([{"path": "x", "sha256": "abc"}]).to_csv(versions, index=False)
     pd.DataFrame([{"class_name": "player", "row_count": 1}]).to_csv(audit_dir / "by_class.csv", index=False)
     pd.DataFrame([{"class_name": "player", "f1": 1.0}]).to_csv(metrics, index=False)

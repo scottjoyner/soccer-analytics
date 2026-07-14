@@ -22,12 +22,15 @@ def run_local_training_chain(
     grid_columns: list[str],
     label_column: str = "label",
     rights_status: str = "owned",
+    rights_reference: str = "",
     group_column: str | None = "match_id",
     order_column: str | None = None,
     detection_source: Path | None = None,
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = write_local_video_catalog(footage_root, output_dir / "local_video_manifest.csv", rights_status=rights_status)
+    manifest_path = write_local_video_catalog(
+        footage_root, output_dir / "local_video_manifest.csv", rights_status=rights_status, rights_reference=rights_reference
+    )
     model_dir = output_dir / "simple_model"
     predictions_path = output_dir / "predictions.csv"
     registry_path = output_dir / "registry.csv"

@@ -36,6 +36,7 @@ def test_run_local_training_chain(tmp_path) -> None:
         ["speed_last", "pressure_last"],
         ["g0", "g1", "g2", "g3"],
         order_column="timestamp_seconds",
+        rights_reference="personal-recording://self",
         detection_source=detections,
     )
     assert paths["manifest"].exists()

@@ -38,8 +38,9 @@ def write_detection_annotations(
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     class_to_id = build_class_index(classes)
+    known = detections[detections[class_column].isin(classes)]
     paths: dict[str, Path] = {}
-    for frame_id, group in detections.groupby(frame_column):
+    for frame_id, group in known.groupby(frame_column):
         path = output_dir / f"{frame_id}.txt"
         lines = [normalized_box_line(row, class_to_id, image_width, image_height, class_column) for _, row in group.iterrows()]
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")

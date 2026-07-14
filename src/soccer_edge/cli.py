@@ -34,7 +34,7 @@ from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_inge
 from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
-from soccer_edge.ingest.video_discovery import build_candidate
+from soccer_edge.ingest.video_discovery import append_candidate, build_candidate
 from soccer_edge.local_finetune_pipeline import run_local_finetune_pipeline
 from soccer_edge.local_finetune_plan import write_local_finetune_shell_plan
 from soccer_edge.local_training_chain import run_local_training_chain
@@ -51,6 +51,14 @@ from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.registry import write_registry_index, write_registry_summary
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
+from soccer_edge.pipeline.match_predictor import (
+    build_match_grid_table_multi,
+    build_prediction_dataset_multi,
+    match_result_labels,
+    train_match_predictor,
+    train_match_predictor_cnn,
+)
+from soccer_edge.pipeline.object_finetune import run_player_ball_finetune
 from soccer_edge.models.tensor_samples import build_npz_from_table
 from soccer_edge.object_confusion import write_confusion_outputs
 from soccer_edge.object_eval import write_object_eval_metrics
@@ -60,10 +68,11 @@ from soccer_edge.player_stats import write_player_form_features, write_player_ma
 from soccer_edge.promotion_gate import write_promotion_gate_report
 from soccer_edge.raw_data_sources import write_raw_data_sources
 from soccer_edge.training_sources import write_training_sources
-from soccer_edge.video.batch_runner import build_processing_plan
+from soccer_edge.video.batch_runner import assert_processable, build_processing_plan
 from soccer_edge.video.calibration_io import load_homography
 from soccer_edge.video.local_catalog import write_local_video_catalog
 from soccer_edge.video.state_tables import write_video_state_tables
+from soccer_edge.video.yolo_pipeline import run_yolo_detection
 
 app = typer.Typer(help="Soccer analytics research CLI.")
 ingest_app = typer.Typer(help="Ingest open soccer datasets.")
@@ -171,11 +180,44 @@ def discover_video(
     query: str = typer.Option(...),
     url: str = typer.Option("https://example.com/manual-review"),
     title: str = typer.Option("Manual review candidate"),
+    channel: str | None = typer.Option(None),
+    rights_status: str = typer.Option("pending"),
+    rights_reference: str | None = typer.Option(None, help="Explicit written-rights reference (required for approved statuses)."),
+    notes: str | None = typer.Option(None),
+    output: Path | None = typer.Option(None, help="Manifest CSV to append the candidate to (metadata only)."),
 ) -> None:
-    """Store candidate video metadata only."""
+    """Store candidate video metadata only. Never downloads or caches audiovisual content."""
 
-    candidate = build_candidate(url=url, title=title, query=query)
-    console.print(candidate)
+    candidate = build_candidate(
+        url=url,
+        title=title,
+        query=query,
+        channel=channel,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        notes=notes,
+    )
+    if output is not None:
+        path = append_candidate(candidate, output)
+        console.print(f"wrote={path} rights_status={candidate.rights_status}")
+    else:
+        console.print(candidate)
+
+
+def _enforce_rights_gate(
+    manifest: Path | None,
+    video_id: str | None,
+    input_path: Path,
+    licensed_root: Path,
+) -> None:
+    """Defense-in-depth: if a manifest row is named, refuse to open the footage
+    unless it is an approved, rights-referenced row whose path matches input."""
+
+    if manifest is None and video_id is None:
+        return
+    if manifest is None or video_id is None:
+        raise typer.BadParameter("--manifest and --video-id must be supplied together.")
+    assert_processable(manifest, video_id, input_path, licensed_root)
 
 
 @video_app.command("catalog-local")
@@ -183,11 +225,14 @@ def catalog_local_video(
     root: Path = typer.Option(..., exists=True),
     output: Path = typer.Option(Path("manifests/local_video_manifest.csv")),
     rights_status: str = typer.Option("owned"),
+    rights_reference: str = typer.Option("", help="Explicit written-rights reference (required for approved statuses)."),
     clip_type: str = typer.Option("full_match"),
 ) -> None:
     """Catalog approved local footage into a manifest."""
 
-    path = write_local_video_catalog(root=root, output=output, rights_status=rights_status, clip_type=clip_type)
+    path = write_local_video_catalog(
+        root=root, output=output, rights_status=rights_status, rights_reference=rights_reference, clip_type=clip_type
+    )
     console.print(f"wrote={path}")
 
 
@@ -207,9 +252,13 @@ def process_video(
     input_path: Path = typer.Option(..., "--input", exists=True),
     output_dir: Path = typer.Option(Path("data/processed/video_pipeline")),
     frame_count: int = typer.Option(0),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
 ) -> None:
     """Run the first local licensed video processing stub."""
 
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
     result = run_media_table_stub(input_path=input_path, output_dir=output_dir, frame_count=frame_count)
     console.print(result)
 
@@ -221,9 +270,13 @@ def export_frames(
     manifest_output: Path = typer.Option(Path("data/processed/frame_manifest.csv")),
     stride: int = typer.Option(1),
     max_frames: int | None = typer.Option(None),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
 ) -> None:
     """Export local video frames and a manifest with image paths."""
 
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
     path = export_video_frame_manifest(input_path, output_dir, manifest_output, stride=stride, max_frames=max_frames)
     console.print(f"wrote={path}")
 
@@ -236,13 +289,50 @@ def process_video_local_model(
     stride: int = typer.Option(1),
     max_samples: int | None = typer.Option(None),
     calibration: Path | None = typer.Option(None, exists=False),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
 ) -> None:
     """Run optional local object-model inference over approved local footage."""
 
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
     runner = LocalObjectRunner(model_path)
     callback = make_media_callback(runner)
     transform = load_homography(calibration) if calibration is not None else None
     paths = run_media_processing_loop(input_path=input_path, output_dir=output_dir, callback=callback, stride=stride, max_samples=max_samples, transform=transform)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@video_app.command("detect-yolo")
+def detect_yolo(
+    input_path: Path = typer.Option(..., "--input", exists=True, help="Local licensed footage only."),
+    model_path: Path = typer.Option(..., exists=True, help="YOLO weights, e.g. yolov8n.pt or a fine-tuned .pt."),
+    output_dir: Path = typer.Option(Path("data/processed/video_yolo")),
+    stride: int = typer.Option(1),
+    max_samples: int | None = typer.Option(None),
+    confidence: float = typer.Option(0.25),
+    calibration: Path | None = typer.Option(None, exists=False),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
+) -> None:
+    """Run a YOLO detector over approved local footage and write detection tables.
+
+    Only use local licensed footage. Public video URLs are discovery metadata and
+    must never be passed here.
+    """
+
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
+    transform = load_homography(calibration) if calibration is not None else None
+    paths = run_yolo_detection(
+        input_path=input_path,
+        output_dir=output_dir,
+        model_path=model_path,
+        stride=stride,
+        max_samples=max_samples,
+        confidence_threshold=confidence,
+        transform=transform,
+    )
     console.print({name: str(path) for name, path in paths.items()})
 
 
@@ -543,6 +633,7 @@ def train_cnn(
     epochs: int = typer.Option(1),
     batch_size: int = typer.Option(4),
     hidden_size: int = typer.Option(128),
+    device: str | None = typer.Option(None, help="Torch device: cuda (ROCm/NVIDIA), mps, or cpu. Auto-detected if omitted."),
 ) -> None:
     """Fit a CNN from an NPZ tensor dataset."""
 
@@ -553,6 +644,7 @@ def train_cnn(
         epochs=epochs,
         batch_size=batch_size,
         hidden_size=hidden_size,
+        device=device,
     )
     console.print({name: str(path) for name, path in paths.items()})
 
@@ -567,6 +659,7 @@ def train_local_chain(
     grid_columns: str = typer.Option(...),
     label: str = typer.Option("label"),
     rights_status: str = typer.Option("owned"),
+    rights_reference: str = typer.Option("", help="Explicit written-rights reference (required for approved statuses)."),
     group: str | None = typer.Option("match_id"),
     order: str | None = typer.Option(None),
     detection_source: Path | None = typer.Option(None, exists=False),
@@ -582,6 +675,7 @@ def train_local_chain(
         grid_columns=[column.strip() for column in grid_columns.split(",") if column.strip()],
         label_column=label,
         rights_status=rights_status,
+        rights_reference=rights_reference,
         group_column=group,
         order_column=order,
         detection_source=detection_source,
@@ -604,6 +698,9 @@ def train_local_finetune(
     train_object_model: bool = typer.Option(False),
     dry_run_plan: Path | None = typer.Option(None, exists=False),
     validate_plan_inputs: bool = typer.Option(False),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
 ) -> None:
     """Run the local fine-tuning path from frames through optional object training."""
 
@@ -625,6 +722,7 @@ def train_local_finetune(
         return
     if not input_path.exists() or not object_model_path.exists():
         raise typer.BadParameter("--input and --object-model-path must exist unless --dry-run-plan is used")
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
     class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
     outputs = run_local_finetune_pipeline(
         input_path=input_path,
@@ -656,6 +754,109 @@ def train_object_model(
     config = ObjectTrainingConfig(data_config=data_config, base_model=base_model, output_dir=output_dir, run_name=run_name, epochs=epochs, image_size=image_size)
     paths = run_object_training(config)
     console.print({name: str(path) for name, path in paths.items()})
+
+
+@train_app.command("match-predictor")
+def train_match_predictor_cmd(
+    detections: list[Path] = typer.Option(..., exists=True, help="One YOLO detection table (parquet/csv) per match."),
+    results: Path = typer.Option(..., exists=True, help="Match results CSV with match_id,home_score,away_score."),
+    output_dir: Path = typer.Option(Path("data/processed/match_predictor")),
+    match_ids: list[str] | None = typer.Option(None, help="Match id per detections file; defaults to file stem."),
+    columns: str | None = typer.Option(None, help="Comma-separated feature columns."),
+) -> None:
+    """Finetune a winner classifier + home/away score regressors from CV detections + results.
+
+    Pass one detection table per match. Match ids default to each file's stem.
+    """
+
+    res_frame = pd.read_csv(results)
+    labeled = match_result_labels(res_frame)
+    detections_by_match: dict[str, pd.DataFrame] = {}
+    for index, detection_path in enumerate(detections):
+        match_id = match_ids[index] if match_ids and index < len(match_ids) else detection_path.stem
+        detections_by_match[match_id] = (
+            pd.read_parquet(detection_path) if detection_path.suffix == ".parquet" else pd.read_csv(detection_path)
+        )
+    dataset = build_prediction_dataset_multi(labeled, detections_by_match)
+    feature_columns = [column.strip() for column in columns.split(",") if column.strip()] if columns else None
+    paths = train_match_predictor(dataset, output_dir, feature_columns=feature_columns)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@train_app.command("match-predictor-cnn")
+def train_match_predictor_cnn_cmd(
+    detections: list[Path] = typer.Option(..., exists=True, help="One YOLO detection table (parquet/csv) per match."),
+    results: Path = typer.Option(..., exists=True, help="Match results CSV with match_id,home_score,away_score."),
+    output_dir: Path = typer.Option(Path("data/processed/match_predictor_cnn")),
+    match_ids: list[str] | None = typer.Option(None, help="Match id per detections file; defaults to file stem."),
+    sequence_length: int = typer.Option(4),
+    device: str | None = typer.Option(None, help="Torch device: cuda (ROCm/NVIDIA), mps, or cpu. Auto-detected if omitted."),
+    epochs: int = typer.Option(2),
+    batch_size: int = typer.Option(4),
+    hidden_size: int = typer.Option(64),
+) -> None:
+    """Finetune a CNN winner model from occupancy-grid tensors built from YOLO detections.
+
+    Pass one detection table per match. Match ids default to each file's stem.
+    """
+
+    res_frame = pd.read_csv(results)
+    labeled = match_result_labels(res_frame)
+    detections_by_match: dict[str, pd.DataFrame] = {}
+    for index, detection_path in enumerate(detections):
+        match_id = match_ids[index] if match_ids and index < len(match_ids) else detection_path.stem
+        detections_by_match[match_id] = (
+            pd.read_parquet(detection_path) if detection_path.suffix == ".parquet" else pd.read_csv(detection_path)
+        )
+    grid_table = build_match_grid_table_multi(labeled, detections_by_match)
+    paths = train_match_predictor_cnn(
+        grid_table,
+        output_dir,
+        sequence_length=sequence_length,
+        device=device,
+        epochs=epochs,
+        batch_size=batch_size,
+        hidden_size=hidden_size,
+    )
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@train_app.command("player-ball")
+def train_player_ball_cmd(
+    input_path: Path = typer.Option(..., "--input", exists=True, help="Local licensed footage only."),
+    base_model: Path = typer.Option(..., exists=True, help="Base YOLO weights, e.g. yolov8n.pt."),
+    output_dir: Path = typer.Option(Path("data/processed/player_ball_finetune")),
+    object_model_path: Path | None = typer.Option(None, exists=True),
+    calibration: Path | None = typer.Option(None, exists=False),
+    stride: int = typer.Option(5),
+    max_frames: int | None = typer.Option(100),
+    train_fraction: float = typer.Option(0.8),
+    threshold: float = typer.Option(0.5),
+    train_object_model: bool = typer.Option(True),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
+) -> None:
+    """Fine-tune a player/ball detector on approved local footage.
+
+    Only use local licensed footage. Public video URLs are discovery metadata and
+    must never be passed here.
+    """
+
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
+    outputs = run_player_ball_finetune(
+        input_path=input_path,
+        base_model_path=base_model,
+        output_dir=output_dir,
+        object_model_path=object_model_path,
+        calibration_path=calibration,
+        stride=stride,
+        max_frames=max_frames,
+        train_fraction=train_fraction,
+        threshold=threshold,
+        train_object_model=train_object_model,
+    )
+    console.print({name: str(path) if path is not None else None for name, path in outputs.__dict__.items()})
 
 
 @train_app.command("prematch")
@@ -950,6 +1151,104 @@ def examples_tiny(
 
     paths = run_tiny_example_pipeline(repo_root=repo_root, output_dir=output_dir)
     console.print({name: str(path) for name, path in paths.items()})
+
+
+@examples_app.command("match-prediction")
+def examples_match_prediction(
+    detections: Path = typer.Option(Path("data/processed/video_yolo/detections.parquet")),
+    results: Path = typer.Option(Path("examples/match_results_example.csv")),
+    output_dir: Path = typer.Option(Path("data/processed/examples/match_prediction")),
+) -> None:
+    """End-to-end demo: YOLO detections + match results -> winner/score model.
+
+    match_001 uses the local synthetic YOLO detections; the remaining matches get
+    deterministic synthetic detection rows so the multi-class training path runs.
+    Swap in detections from real licensed footage and real StatsBomb results to train
+    on production data.
+    """
+
+    det_frame = pd.read_parquet(detections) if detections.suffix == ".parquet" else pd.read_csv(detections)
+    res_frame = pd.read_csv(results)
+    labeled = match_result_labels(res_frame)
+
+    detections_by_match: dict[str, pd.DataFrame] = {}
+    for idx, match_id in enumerate(labeled["match_id"]):
+        if idx == 0:
+            detections_by_match[match_id] = det_frame
+        else:
+            detections_by_match[match_id] = _synthetic_detections(match_id, frame_count=len(det_frame))
+
+    dataset = build_prediction_dataset_multi(labeled, detections_by_match)
+    paths = train_match_predictor(dataset, output_dir)
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+@examples_app.command("match-prediction-cnn")
+def examples_match_prediction_cnn(
+    detections: Path = typer.Option(Path("data/processed/video_yolo/detections.parquet")),
+    results: Path = typer.Option(Path("examples/match_results_example.csv")),
+    output_dir: Path = typer.Option(Path("data/processed/examples/match_prediction_cnn")),
+    sequence_length: int = typer.Option(4),
+    device: str | None = typer.Option(None, help="Torch device; auto-detected (cuda/ROCm, mps, cpu)."),
+) -> None:
+    """End-to-end demo: YOLO detections -> occupancy-grid tensors -> CNN winner model.
+
+    match_001 uses the local synthetic YOLO detections; remaining matches get
+    deterministic synthetic detection rows so the multi-class training path runs.
+    """
+
+    det_frame = pd.read_parquet(detections) if detections.suffix == ".parquet" else pd.read_csv(detections)
+    res_frame = pd.read_csv(results)
+    labeled = match_result_labels(res_frame)
+
+    detections_by_match: dict[str, pd.DataFrame] = {}
+    for idx, match_id in enumerate(labeled["match_id"]):
+        detections_by_match[match_id] = det_frame if idx == 0 else _synthetic_detections(match_id, frame_count=len(det_frame))
+    grid_table = build_match_grid_table_multi(labeled, detections_by_match)
+    paths = train_match_predictor_cnn(
+        grid_table, output_dir, sequence_length=sequence_length, device=device
+    )
+    console.print({name: str(path) for name, path in paths.items()})
+
+
+def _synthetic_detections(match_id: str, frame_count: int = 6) -> pd.DataFrame:
+    """Deterministic synthetic detections so the demo trains without real footage.
+
+    Not real data: player/ball counts vary per match to exercise the feature builder.
+    """
+
+    seed = sum(ord(char) for char in match_id)
+    n_player = 5 + (seed % 6)
+    n_ball = 1 + (seed % 2)
+    rows = []
+    for frame_idx in range(frame_count):
+        for player_idx in range(n_player):
+            x1 = (player_idx * 30 + frame_idx * 5) % 900
+            rows.append(
+                {
+                    "frame_idx": frame_idx,
+                    "class_name": "player",
+                    "confidence": 0.9,
+                    "x1": float(x1),
+                    "y1": 100.0,
+                    "x2": float(x1 + 40),
+                    "y2": 180.0,
+                }
+            )
+        for ball_idx in range(n_ball):
+            bx = (ball_idx * 200 + frame_idx * 7) % 900
+            rows.append(
+                {
+                    "frame_idx": frame_idx,
+                    "class_name": "ball",
+                    "confidence": 0.8,
+                    "x1": float(bx),
+                    "y1": 50.0,
+                    "x2": float(bx + 12),
+                    "y2": 62.0,
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 @app.command()

@@ -36,3 +36,6 @@ data/predictions/**
 .DS_Store
 .vscode/
 .idea/
+# Downloaded model weights
+*.pt
+*.ptc
