@@ -1,4 +1,11 @@
+from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class PlanValidationResult:
+    ok: bool
+    missing_paths: list[str]
 
 
 def shell_quote(path: Path | str) -> str:
@@ -8,6 +15,18 @@ def shell_quote(path: Path | str) -> str:
     if all(character.isalnum() or character in "._/-" for character in text):
         return text
     return "'" + text.replace("'", "'\\''") + "'"
+
+
+def validate_local_finetune_inputs(
+    input_path: Path,
+    object_model_path: Path,
+    calibration_path: Path | None = None,
+) -> PlanValidationResult:
+    required = [input_path, object_model_path]
+    if calibration_path is not None:
+        required.append(calibration_path)
+    missing = [str(path) for path in required if not path.exists()]
+    return PlanValidationResult(ok=not missing, missing_paths=missing)
 
 
 def local_finetune_shell_plan(
@@ -58,7 +77,12 @@ def write_local_finetune_shell_plan(
     max_frames: int | None = 100,
     threshold: float = 0.5,
     train_fraction: float = 0.8,
+    validate_inputs: bool = False,
 ) -> Path:
+    if validate_inputs:
+        validation = validate_local_finetune_inputs(input_path, object_model_path, calibration_path)
+        if not validation.ok:
+            raise FileNotFoundError(f"missing required paths: {validation.missing_paths}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         local_finetune_shell_plan(
