@@ -1,0 +1,13 @@
+{
+  "created_at_utc": "2026-07-14T23:18:25.499587+00:00",
+  "feature_names": [
+    "spatial_grid"
+  ],
+  "metrics": {
+    "batches_seen": 2844.0,
+    "final_loss": 1.0590827773140452
+  },
+  "name": "field_state_cnn",
+  "notes": "",
+  "version": "v0"
+}
