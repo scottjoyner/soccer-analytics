@@ -1,0 +1,99 @@
+match_id,home_team,away_team,home_wins,home_draws,home_losses,home_goals_for,home_goals_against,home_goal_diff,away_wins,away_draws,away_losses,away_goals_for,away_goals_against,away_goal_diff,home_score,away_score,winner
+HL001,Argentina,Switzerland,6,0,0,17,6,11,3,2,1,10,6,4,3,1,home
+HL002,Norway,England,4,0,2,13,11,2,4,1,0,11,5,6,1,2,away
+HL003,Spain,Belgium,5,1,0,11,1,10,3,2,1,14,7,7,2,1,home
+HL004,France,Morocco,6,0,0,16,2,14,3,2,1,10,6,4,2,0,home
+HL005,Switzerland,Colombia,3,2,1,10,6,4,3,2,0,5,1,4,0,0,draw
+HL006,Argentina,Egypt,6,0,0,17,6,11,1,3,1,8,7,1,3,2,home
+HL007,USA,Belgium,3,0,2,11,8,3,3,2,1,14,7,7,1,4,away
+HL008,Portugal,Spain,2,2,1,8,3,5,5,1,0,11,1,10,0,1,away
+HL009,Mexico,England,4,0,1,10,3,7,4,1,0,11,5,6,2,3,away
+HL010,Brazil,Norway,3,1,1,10,4,6,4,0,2,13,11,2,1,2,away
+HL011,Paraguay,France,1,2,2,3,6,-3,6,0,0,16,2,14,0,1,away
+HL012,Canada,Morocco,2,1,2,9,6,3,3,2,1,10,6,4,0,3,away
+HL013,Colombia,Ghana,3,2,0,5,1,4,1,1,2,2,3,-1,1,0,home
+HL014,Argentina,Cabo Verde,6,0,0,17,6,11,0,3,1,4,5,-1,3,2,home
+HL015,Australia,Egypt,1,2,1,3,3,0,1,3,1,8,7,1,1,1,draw
+HL016,Switzerland,Algeria,3,2,1,10,6,4,1,1,2,5,9,-4,2,0,home
+HL017,Portugal,Croatia,2,2,1,8,3,5,2,0,2,6,7,-1,2,1,home
+HL018,Spain,Austria,5,1,0,11,1,10,1,1,2,6,9,-3,3,0,home
+HL019,USA,Bosnia And Herzegovina,3,0,2,11,8,3,0,0,1,0,2,-2,2,0,home
+HL020,Belgium,Senegal,3,2,1,14,7,7,1,0,3,10,9,1,3,2,home
+HL021,Mexico,Ecuador,4,0,1,10,3,7,1,1,2,2,4,-2,2,0,home
+HL022,France,Sweden,6,0,0,16,2,14,1,1,2,7,10,-3,3,0,home
+HL023,Cote d'Ivoire,Norway,1,0,2,4,4,0,4,0,2,13,11,2,1,2,away
+HL024,Netherlands,Morocco,2,2,0,11,5,6,3,2,1,10,6,4,1,1,draw
+HL025,Germany,Paraguay,2,1,1,11,5,6,1,2,2,3,6,-3,1,1,draw
+HL026,Brazil,Japan,3,1,1,10,4,6,0,2,1,4,5,-1,2,1,home
+HL027,South Africa,Canada,1,1,2,2,4,-2,2,1,2,9,6,3,0,1,away
+HL028,Algeria,Austria,1,1,2,5,9,-4,1,1,2,6,9,-3,3,3,draw
+HL029,Jordan,Argentina,0,0,3,3,8,-5,6,0,0,17,6,11,1,3,away
+HL030,Colombia,Portugal,3,2,0,5,1,4,2,2,1,8,3,5,0,0,draw
+HL031,Congo DR,Uzbekistan,1,1,1,4,3,1,0,0,3,2,11,-9,3,1,home
+HL032,Croatia,Ghana,2,0,2,6,7,-1,1,1,2,2,3,-1,2,1,home
+HL033,Panama,England,0,0,3,0,4,-4,4,1,0,11,5,6,0,2,away
+HL034,Egypt,IR Iran,1,3,1,8,7,1,0,3,0,3,3,0,1,1,draw
+HL035,New Zealand,Belgium,0,1,2,4,10,-6,3,2,1,14,7,7,1,5,away
+HL036,Cabo Verde,Saudi Arabia,0,3,1,4,5,-1,0,2,1,1,5,-4,0,0,draw
+HL037,Uruguay,Spain,0,2,1,3,4,-1,5,1,0,11,1,10,0,1,away
+HL038,Senegal,Iraq,1,0,3,10,9,1,0,0,3,1,12,-11,5,0,home
+HL039,Norway,France,4,0,2,13,11,2,6,0,0,16,2,14,1,4,away
+HL040,Türkiye,USA,1,0,2,3,5,-2,3,0,2,11,8,3,3,2,home
+HL041,Paraguay,Australia,1,2,2,3,6,-3,1,2,1,3,3,0,0,0,draw
+HL042,Japan,Sweden,0,2,1,4,5,-1,1,1,2,7,10,-3,1,1,draw
+HL043,Tunisia,Netherlands,0,0,2,2,8,-6,2,2,0,11,5,6,1,3,away
+HL044,Curacao,Cote d'Ivoire,0,1,2,1,9,-8,1,0,2,4,4,0,0,2,away
+HL045,Ecuador,Germany,1,1,2,2,4,-2,2,1,1,11,5,6,2,1,home
+HL046,South Africa,Korea Republic,1,1,2,2,4,-2,1,0,2,2,3,-1,1,0,home
+HL047,Czechia,Mexico,0,1,2,2,6,-4,4,0,1,10,3,7,0,3,away
+HL048,Morocco,Haiti,3,2,1,10,6,4,0,0,3,2,8,-6,4,2,home
+HL049,Scotland,Brazil,1,0,2,1,4,-3,3,1,1,10,4,6,0,3,away
+HL050,Bosnia and Herzegovina,Qatar,1,1,1,5,6,-1,0,1,2,2,10,-8,3,1,home
+HL051,Switzerland,Canada,3,2,1,10,6,4,2,1,2,9,6,3,2,1,home
+HL052,Colombia,Congo DR,3,2,0,5,1,4,1,1,1,4,3,1,1,0,home
+HL053,Panama,Croatia,0,0,3,0,4,-4,2,0,2,6,7,-1,0,1,away
+HL054,England,Ghana,4,1,0,11,5,6,1,1,2,2,3,-1,0,0,draw
+HL055,Portugal,Uzbekistan,2,2,1,8,3,5,0,0,3,2,11,-9,5,0,home
+HL056,Jordan,Algeria,0,0,3,3,8,-5,1,1,2,5,9,-4,1,2,away
+HL057,Norway,Senegal,4,0,2,13,11,2,1,0,3,10,9,1,3,2,home
+HL058,France,Iraq,6,0,0,16,2,14,0,0,3,1,12,-11,3,0,home
+HL059,Argentina,Austria,6,0,0,17,6,11,1,1,2,6,9,-3,2,0,home
+HL060,New Zealand,Egypt,0,1,2,4,10,-6,1,3,1,8,7,1,1,3,away
+HL061,Uruguay,Cabo Verde,0,2,1,3,4,-1,0,3,1,4,5,-1,2,2,draw
+HL062,Belgium,IR Iran,3,2,1,14,7,7,0,3,0,3,3,0,0,0,draw
+HL063,Spain,Saudi Arabia,5,1,0,11,1,10,0,2,1,1,5,-4,4,0,home
+HL064,Ecuador,Curacao,1,1,2,2,4,-2,0,1,2,1,9,-8,0,0,draw
+HL065,Germany,Cote d'Ivoire,2,1,1,11,5,6,1,0,2,4,4,0,2,1,home
+HL066,Netherlands,Sweden,2,2,0,11,5,6,1,1,2,7,10,-3,5,1,home
+HL067,Türkiye,Paraguay,1,0,2,3,5,-2,1,2,2,3,6,-3,0,1,away
+HL068,Brazil,Haiti,3,1,1,10,4,6,0,0,3,2,8,-6,3,0,home
+HL069,Scotland,Morocco,1,0,2,1,4,-3,3,2,1,10,6,4,0,1,away
+HL070,USA,Australia,3,0,2,11,8,3,1,2,1,3,3,0,2,0,home
+HL071,Mexico,Korea Republic,4,0,1,10,3,7,1,0,2,2,3,-1,1,0,home
+HL072,Canada,Qatar,2,1,2,9,6,3,0,1,2,2,10,-8,6,0,home
+HL073,Switzerland,Bosnia and Herzegovina,3,2,1,10,6,4,1,1,1,5,6,-1,4,1,home
+HL074,Czechia,South Africa,0,1,2,2,6,-4,1,1,2,2,4,-2,1,1,draw
+HL075,Uzbekistan,Colombia,0,0,3,2,11,-9,3,2,0,5,1,4,1,3,away
+HL076,Ghana,Panama,1,1,2,2,3,-1,0,0,3,0,4,-4,1,0,home
+HL077,England,Croatia,4,1,0,11,5,6,2,0,2,6,7,-1,4,2,home
+HL078,Portugal,Congo DR,2,2,1,8,3,5,1,1,1,4,3,1,1,1,draw
+HL079,Austria,Jordan,1,1,2,6,9,-3,0,0,3,3,8,-5,3,1,home
+HL080,Argentina,Algeria,6,0,0,17,6,11,1,1,2,5,9,-4,3,0,home
+HL081,Iraq,Norway,0,0,3,1,12,-11,4,0,2,13,11,2,1,4,away
+HL082,France,Senegal,6,0,0,16,2,14,1,0,3,10,9,1,3,1,home
+HL083,IR Iran,New Zealand,0,3,0,3,3,0,0,1,2,4,10,-6,2,2,draw
+HL084,Saudi Arabia,Uruguay,0,2,1,1,5,-4,0,2,1,3,4,-1,1,1,draw
+HL085,Belgium,Egypt,3,2,1,14,7,7,1,3,1,8,7,1,1,1,draw
+HL086,Spain,Cabo Verde,5,1,0,11,1,10,0,3,1,4,5,-1,0,0,draw
+HL087,Sweden,Tunisia,1,1,2,7,10,-3,0,0,2,2,8,-6,5,1,home
+HL088,Côte d'Ivoire,Ecuador,1,0,0,1,0,1,1,1,2,2,4,-2,1,0,home
+HL089,Netherlands,Japan,2,2,0,11,5,6,0,2,1,4,5,-1,2,2,draw
+HL090,Germany,Curacao,2,1,1,11,5,6,0,1,2,1,9,-8,7,1,home
+HL091,Australia,Türkiye,1,2,1,3,3,0,1,0,2,3,5,-2,2,0,home
+HL092,Haiti,Scotland,0,0,3,2,8,-6,1,0,2,1,4,-3,0,1,away
+HL093,Brazil,Morocco,3,1,1,10,4,6,3,2,1,10,6,4,1,1,draw
+HL094,Qatar,Switzerland,0,1,2,2,10,-8,3,2,1,10,6,4,1,1,draw
+HL095,USA,Paraguay,3,0,2,11,8,3,1,2,2,3,6,-3,4,1,home
+HL096,Canada,Bosnia and Herzegovina,2,1,2,9,6,3,1,1,1,5,6,-1,1,1,draw
+HL097,Korea Republic,Czechia,1,0,2,2,3,-1,0,1,2,2,6,-4,2,1,home
+HL098,Mexico,South Africa,4,0,1,10,3,7,1,1,2,2,4,-2,2,0,home
