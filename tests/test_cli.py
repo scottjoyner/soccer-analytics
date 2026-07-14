@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
@@ -290,3 +291,52 @@ def test_model_calibration_review_command(tmp_path) -> None:
     assert result.exit_code == 0
     assert (output_dir / "metrics.json").exists()
     assert (output_dir / "calibration.json").exists()
+
+
+def test_features_player_aggregate_command(tmp_path) -> None:
+    stats = pd.DataFrame(
+        [
+            {"match_id": 1, "player_name": "A", "team_name": "Home", "shots": 2, "goals": 1, "passes": 10, "completed_passes": 8},
+            {"match_id": 2, "player_name": "A", "team_name": "Home", "shots": 0, "goals": 0, "passes": 12, "completed_passes": 9},
+        ]
+    )
+    source = tmp_path / "stats.csv"
+    stats.to_csv(source, index=False)
+    output = tmp_path / "agg.csv"
+    result = runner.invoke(
+        app,
+        ["features", "player-aggregate", "--player-stats", str(source), "--output", str(output)],
+    )
+    assert result.exit_code == 0
+    assert output.exists()
+    frame = pd.read_csv(output)
+    assert frame.iloc[0]["player_name"] == "A"
+    assert frame.iloc[0]["appearances"] == 2
+    assert frame.iloc[0]["total_goals"] == 1
+
+
+def test_features_player_aggregate_requires_input(tmp_path) -> None:
+    result = runner.invoke(app, ["features", "player-aggregate", "--output", str(tmp_path / "out.csv")])
+    assert result.exit_code != 0
+
+
+def test_features_player_aggregate_split_by_opponent(tmp_path) -> None:
+    stats = pd.DataFrame(
+        [
+            {"match_id": 1, "player_name": "A", "team_name": "Home", "goals": 1, "passes": 5, "completed_passes": 4},
+            {"match_id": 2, "player_name": "A", "team_name": "Home", "goals": 0, "passes": 5, "completed_passes": 3},
+            {"match_id": 1, "player_name": "B", "team_name": "Away", "goals": 0, "passes": 2, "completed_passes": 1},
+            {"match_id": 2, "player_name": "B", "team_name": "Away", "goals": 0, "passes": 2, "completed_passes": 1},
+        ]
+    )
+    source = tmp_path / "stats.csv"
+    stats.to_csv(source, index=False)
+    output = tmp_path / "agg.csv"
+    result = runner.invoke(
+        app,
+        ["features", "player-aggregate", "--player-stats", str(source), "--split-by", "opponent", "--output", str(output)],
+    )
+    assert result.exit_code == 0
+    frame = pd.read_csv(output)
+    assert "opponent_team" in frame.columns
+    assert frame[frame["player_name"] == "A"]["opponent_team"].iloc[0] == "Away"

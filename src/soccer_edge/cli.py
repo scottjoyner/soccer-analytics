@@ -64,7 +64,12 @@ from soccer_edge.object_confusion import write_confusion_outputs
 from soccer_edge.object_eval import write_object_eval_metrics
 from soccer_edge.object_model import LocalObjectRunner
 from soccer_edge.object_training import ObjectTrainingConfig, run_object_training
-from soccer_edge.player_stats import write_player_form_features, write_player_match_stats
+from soccer_edge.player_stats import (
+    build_player_aggregates,
+    build_player_match_stats,
+    write_player_form_features,
+    write_player_match_stats,
+)
 from soccer_edge.promotion_gate import write_promotion_gate_report
 from soccer_edge.raw_data_sources import write_raw_data_sources
 from soccer_edge.training_sources import write_training_sources
@@ -577,6 +582,43 @@ def build_player_form(
 
     path = write_player_form_features(player_stats, output, window=window, order_column=order_column)
     console.print(f"wrote={path}")
+
+
+@features_app.command("player-aggregate")
+def build_player_aggregate(
+    player_stats: list[Path] = typer.Option([], exists=True, help="One or more player-match-stats files (csv/parquet)."),
+    events: list[Path] = typer.Option([], exists=True, help="One or more event files; per-match stats computed first."),
+    output: Path = typer.Option(Path("data/processed/player_aggregates.csv")),
+    group_by: str = typer.Option("player_name", help="Comma-separated group columns."),
+    split_by: str = typer.Option("", help="Comma-separated splits: 'team' and/or 'opponent'."),
+) -> None:
+    """Aggregate per-match player stats into cross-match totals/averages/rates.
+
+    Use open event feeds (StatsBomb Open Data, Metrica sample, approved SoccerNet
+    subsets) or already-computed player-match stats. Works on any source whose
+    per-match stats come from ``build_player_match_stats``. Add ``--split-by
+    opponent`` to break totals out per opponent faced.
+    """
+
+    group_keys = [column.strip() for column in group_by.split(",") if column.strip()]
+    split_keys = [column.strip() for column in split_by.split(",") if column.strip()]
+    per_match_frames: list[pd.DataFrame] = []
+    for path in player_stats:
+        per_match_frames.append(pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path))
+    for path in events:
+        event_frame = pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
+        per_match_frames.append(build_player_match_stats(event_frame))
+    if not per_match_frames:
+        raise typer.BadParameter("provide at least one --player-stats or --events file")
+
+    combined = pd.concat(per_match_frames, ignore_index=True)
+    aggregates = build_player_aggregates(combined, group_keys=group_keys, split_by=split_keys)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.suffix == ".parquet":
+        aggregates.to_parquet(output, index=False)
+    else:
+        aggregates.to_csv(output, index=False)
+    console.print(f"wrote={output} players={len(aggregates)}")
 
 
 @features_app.command("tensor-samples")

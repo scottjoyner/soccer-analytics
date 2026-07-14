@@ -8,6 +8,8 @@ soccer-edge ingest write-processed --source data/raw/metrica --source-type metri
 soccer-edge features inplay --source data/processed/game_state.csv --output data/processed/inplay_features.parquet --columns speed,pressure --window-seconds 60
 soccer-edge features player-stats --events data/processed/ingest/events.parquet --output data/processed/player_match_stats.csv
 soccer-edge features player-form --player-stats data/processed/player_match_stats.csv --output data/processed/player_form.csv --window 5 --order-column match_id
+soccer-edge features player-aggregate --player-stats data/processed/player_match_stats.csv --output data/processed/player_aggregates.csv
+soccer-edge features player-aggregate --player-stats data/processed/player_match_stats.csv --split-by opponent --output data/processed/player_aggregates_by_opponent.csv
 soccer-edge train simple --source data/processed/inplay_features.parquet --columns speed_last,pressure_last --label label --output-dir data/processed/simple_model
 soccer-edge model predict --bundle-dir data/processed/simple_model --source data/processed/inplay_features.parquet --output data/processed/predictions.csv
 soccer-edge model registry --root-dir data/processed --output data/processed/model_registry.csv

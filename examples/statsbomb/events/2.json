@@ -1,0 +1,8 @@
+[
+  {"id": 9, "minute": 8, "type": {"id": 30, "name": "Pass"}, "player": {"id": 101, "name": "L. Smith"}, "team": {"id": 1, "name": "Home FC"}, "pass": {}},
+  {"id": 10, "minute": 14, "type": {"id": 16, "name": "Shot"}, "player": {"id": 101, "name": "L. Smith"}, "team": {"id": 1, "name": "Home FC"}, "shot": {"outcome": {"id": 97, "name": "Goal"}}},
+  {"id": 11, "minute": 20, "type": {"id": 72, "name": "Pressure"}, "player": {"id": 201, "name": "M. Reyes"}, "team": {"id": 2, "name": "Away United"}},
+  {"id": 12, "minute": 28, "type": {"id": 43, "name": "Carry"}, "player": {"id": 102, "name": "K. Doe"}, "team": {"id": 1, "name": "Home FC"}},
+  {"id": 13, "minute": 33, "type": {"id": 30, "name": "Pass"}, "player": {"id": 202, "name": "J. Park"}, "team": {"id": 2, "name": "Away United"}, "pass": {"outcome": {"id": 99, "name": "Incomplete"}}},
+  {"id": 14, "minute": 38, "type": {"id": 74, "name": "Interception"}, "player": {"id": 201, "name": "M. Reyes"}, "team": {"id": 2, "name": "Away United"}}
+]

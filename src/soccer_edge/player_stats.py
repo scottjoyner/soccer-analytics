@@ -138,6 +138,103 @@ def build_team_player_feature_table(
     return grouped
 
 
+def assign_match_opponents(player_stats: pd.DataFrame) -> pd.DataFrame:
+    """Add an ``opponent_team`` column: for each match, the other team(s) a player
+    faced (joined with ';' if more than one). Requires ``match_id`` and ``team_name``."""
+
+    if "match_id" not in player_stats.columns or "team_name" not in player_stats.columns:
+        raise ValueError("match_id and team_name are required to compute opponents")
+    frame = player_stats.copy()
+    match_teams = frame.groupby("match_id")["team_name"].apply(lambda values: sorted(set(values.dropna())))
+
+    def opponent_for(row: pd.Series) -> str:
+        teams = match_teams.get(row["match_id"], [])
+        others = [team for team in teams if team != row["team_name"]]
+        return ";".join(others)
+
+    frame["opponent_team"] = frame.apply(opponent_for, axis=1)
+    return frame
+
+
+def build_player_aggregates(
+    player_stats: pd.DataFrame,
+    group_keys: list[str] | None = None,
+    split_by: list[str] | None = None,
+) -> pd.DataFrame:
+    """Aggregate per-match player stats into cross-match summaries.
+
+    For each count metric this produces ``total_<metric>`` (career/season sum) and
+    ``avg_<metric>`` (per-match average), plus ``appearances`` (distinct matches) and
+    an overall ``pass_completion_rate``. Source-agnostic: feed it the output of
+    ``build_player_match_stats`` from any open event feed (StatsBomb, Metrica, ...).
+
+    Use ``split_by=["opponent"]`` to break totals out per opponent faced, or
+    ``split_by=["team"]`` to separate stints by team (useful for transfers).
+    """
+
+    split_by_set = {value.strip() for value in (split_by or []) if value.strip()}
+    group_keys = list(group_keys or ["player_name"])
+    if "player_name" not in player_stats.columns:
+        raise ValueError("player_stats must include a player_name column")
+
+    frame = player_stats.copy()
+    if "opponent" in split_by_set:
+        if "match_id" not in frame.columns or "team_name" not in frame.columns:
+            raise ValueError("match_id and team_name are required to split by opponent")
+        frame = assign_match_opponents(frame)
+        if "opponent_team" not in group_keys:
+            group_keys.append("opponent_team")
+    if "team" in split_by_set and "team_name" not in group_keys:
+        group_keys.append("team_name")
+
+    missing = [key for key in group_keys if key not in frame.columns]
+    if missing:
+        raise ValueError(f"missing group columns: {missing}")
+
+    count_metrics = [
+        column
+        for column in [
+            "total_events",
+            "shots",
+            "goals",
+            "passes",
+            "completed_passes",
+            "carries",
+            "dribbles",
+            "pressures",
+            "interceptions",
+            "tackles",
+            "fouls_committed",
+        ]
+        if column in frame.columns
+    ]
+
+    grouped = frame.groupby(group_keys, dropna=False)
+    order_column = "match_id" if "match_id" in frame.columns else "player_name"
+    agg = grouped.agg(
+        appearances=(order_column, "nunique" if order_column == "match_id" else "size"),
+        **{f"total_{column}": (column, "sum") for column in count_metrics},
+    ).reset_index()
+
+    for column in count_metrics:
+        agg[f"avg_{column}"] = agg[f"total_{column}"] / agg["appearances"].replace(0, pd.NA)
+
+    if "completed_passes" in frame.columns and "passes" in frame.columns:
+        agg["pass_completion_rate"] = agg["total_completed_passes"] / agg["total_passes"].replace(0, pd.NA)
+
+    if "team_name" in frame.columns:
+        if "opponent_team" in group_keys:
+            team = grouped["team_name"].apply(lambda values: ",".join(sorted(set(values.dropna())))).reset_index(name="team")
+            agg = agg.merge(team, on=group_keys)
+        elif "team_name" not in group_keys:
+            teams = grouped["team_name"].apply(lambda values: ",".join(sorted(set(values.dropna())))).reset_index(name="teams")
+            agg = agg.merge(teams, on=group_keys)
+
+    numeric_columns = [column for column in agg.columns if column not in group_keys]
+    agg[numeric_columns] = agg[numeric_columns].fillna(0.0)
+    return agg
+
+
 def write_player_match_stats(events_path: Path, output_path: Path) -> Path:
     events = pd.read_parquet(events_path) if events_path.suffix == ".parquet" else pd.read_csv(events_path)
     stats = build_player_match_stats(events)
@@ -157,4 +254,23 @@ def write_player_form_features(player_stats_path: Path, output_path: Path, windo
         form.to_parquet(output_path, index=False)
     else:
         form.to_csv(output_path, index=False)
+    return output_path
+
+
+def build_player_aggregates_from_events(event_frames: list[pd.DataFrame], group_keys: list[str] | None = None) -> pd.DataFrame:
+    if not event_frames:
+        raise ValueError("at least one event frame is required")
+    per_match = [build_player_match_stats(frame) for frame in event_frames]
+    combined = pd.concat(per_match, ignore_index=True)
+    return build_player_aggregates(combined, group_keys=group_keys)
+
+
+def write_player_aggregates(player_stats_path: Path, output_path: Path, group_keys: list[str] | None = None) -> Path:
+    stats = pd.read_parquet(player_stats_path) if player_stats_path.suffix == ".parquet" else pd.read_csv(player_stats_path)
+    aggregates = build_player_aggregates(stats, group_keys=group_keys)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_path.suffix == ".parquet":
+        aggregates.to_parquet(output_path, index=False)
+    else:
+        aggregates.to_csv(output_path, index=False)
     return output_path
