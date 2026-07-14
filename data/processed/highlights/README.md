@@ -23,6 +23,6 @@ Aggregated from permitted local footage for a research project.
   - model/: tabular winner classifier + home/away score regressors (predictions.csv, dataset.csv)
   - cnn_model/: CNN grid->winner bundle
   - training_summary.md: processing + fine-tune summary
-- highlights_training_data.zip: bundle of the above (model .joblib binaries excluded)
+- highlights_training_data.zip: bundle of the above, **including the fine-tuned model .joblib binaries**
 
 Generated: 2026-07-14T21:08:46.550884Z
