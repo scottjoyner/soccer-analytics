@@ -1,0 +1,206 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\title{A Rights-Safe Local Soccer Analytics Pipeline:\\From Licensed Footage to Match-Outcome Prediction}
+
+\author{
+  The Soccer-Edge Collaboration\\
+  \texttt{github.com/scottjoyner/soccer-analytics}
+}
+\date{Draft --- July 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We present an open, reproducible pipeline for soccer analytics that enforces
+data-rights compliance by construction while turning permitted \emph{local}
+footage and open event data into structured tables, detection datasets, and
+match-outcome models. The system ingests open event feeds (StatsBomb Open Data,
+Metrica Sports sample data, and approved SoccerNet subsets) together with
+rights-approved local video, runs a YOLO-based computer-vision abstraction to
+detect players and the ball, aggregates per-player and per-team statistics, and
+fine-tunes match-outcome predictors (winner classification and home/away score
+regression) as well as a convolutional occupancy-grid model. A lineage-and-rights
+gate refuses to process any footage that lacks a recorded written-rights
+reference, so no scraped or unlicensed audiovisual content can enter the
+pipeline. We report a reproducible case study over 98 permitted FIFA World Cup
+2026 highlight clips, yielding 88,127 detection rows, and we discuss the
+honest limitation that short highlight-clip detection aggregates carry little
+predictive signal for match outcome.
+\end{abstract}
+
+\section{Introduction}
+Data-driven soccer analytics has advanced rapidly, but most pipelines assume
+unfettered access to broadcast footage and event feeds. For academic research
+this assumption is increasingly untenable: audiovisual rights are tightly held,
+and scraping or caching copyrighted video violates both platform terms and the
+data-governance expectations of institutional review. We argue that a
+\emph{rights-safe, local-first} design is not merely a compliance footnote but a
+first-class system property that improves reproducibility: if the pipeline can
+only consume data the researcher is entitled to process, then every published
+result is, by construction, re-runnable by others with equivalent rights.
+
+This paper describes \textsc{Soccer-Edge}, a pipeline organized around three
+invariants: (i) public video URLs are \emph{discovery metadata only} and are
+never processing inputs; (ii) every processed table and derived feature table
+carries lineage fields and an explicit \texttt{rights\_reference}; and (iii) a
+single rights gate is enforced at every footage entry point. We validate the
+system end-to-end on 98 permitted local highlight clips and open event data.
+
+\section{Related Work}
+Event-stream datasets such as StatsBomb Open Data~\cite{statsbomb}, Metrica
+Sports sample tracking~\cite{metrica}, and SoccerNet~\cite{soccernet} have
+enabled reproducible spatiotemporal modeling without audiovisual rights. Prior
+computer-vision work detects players, the ball, and team possession from
+broadcast video using object detectors such as YOLO~\cite{redmon2016yolo,
+ultralytics} and tracks them across frames. Our contribution is not a new
+detector but a \emph{governance wrapper}: a reproducible, rights-gated pipeline
+that composes existing open components (Ultralytics YOLO, scikit-learn,
+PyTorch) into a research workflow that provably cannot ingest unlicensed media.
+
+\section{System Design and the Rights Model}
+The pipeline models provenance explicitly. Every processed table records
+\texttt{lineage\_source\_name}, \texttt{lineage\_source\_path},
+\texttt{lineage\_dataset\_version}, and \texttt{lineage\_ingested\_at\_utc}.
+Footage rows carry a \texttt{rights\_status} drawn from
+$\{\texttt{owned}, \texttt{licensed}, \texttt{compatible\_license},
+\texttt{pending}, \texttt{blocked}\}$, and any approved status \emph{requires} a
+non-empty \texttt{rights\_reference} (an explicit written-rights pointer such as
+a permit file or a recorded consent). 
+
+A single assertion, \texttt{assert\_processable}, is reused across the
+command surface: \texttt{discover video} (metadata only), \texttt{catalog-local},
+\texttt{video plan}, \texttt{detect-yolo}, \texttt{process},
+\texttt{process-local-model}, \texttt{export-frames},
+\texttt{train player-ball}, and \texttt{train local-finetune}. When a
+manifest row is named, the footage file is opened only if its
+\texttt{rights\_reference} is recorded \emph{and} its \texttt{local\_path}
+matches the input. This makes the rights check a hard, test-covered gate rather
+than documentation.
+
+\section{Data}
+\paragraph{Open event data.} StatsBomb Open Data, Metrica sample events/tracking,
+and approved SoccerNet subsets are ingested into normalized Parquet tables with
+lineage. From these we derive per-match player statistics (shots, passes,
+carries, pressures, interceptions, tackles, fouls) and cross-match aggregates
+with per-player totals, per-match averages, and team/opponent splits.
+
+\paragraph{Permitted local footage.} For this study we use 98 FIFA World Cup 2026
+highlight clips that were provided to the authors as permitted local files.
+Their match results (teams, scores, penalty shootouts) are encoded directly in
+the filenames and were parsed into a structured results table; no audiovisual
+content was scraped or downloaded.
+
+\paragraph{Codec handling.} The provided clips are AV1-encoded. The local media
+reader has no AV1 decoder, so each clip is first transcoded to H.264 with
+FFmpeg and then passed to the detector. This transcode step is a
+rights-preserving local transformation of already-permitted footage; the
+original files remain the system of record and the \texttt{rights\_reference}
+propagates to every derived table.
+
+\section{Computer-Vision Abstraction}
+Detections are produced by a \texttt{YOLODetector} wrapping Ultralytics
+YOLOv8n~\cite{ultralytics}, exposed through the \texttt{detect-yolo} command.
+For each clip it emits per-frame player/ball bounding boxes, frame-to-frame
+tracks, and pitch-space ball/player states. From these we compute, per match,
+aggregate features
+\[
+f = (\texttt{n\_player},\ \texttt{n\_ball},\ \texttt{avg\_det\_per\_frame},\
+\texttt{ball\_center\_x},\ \texttt{ball\_center\_y})
+\]
+normalized to the frame. We additionally rasterize each frame into an
+occupancy grid (channels $\times$ height $\times$ width, default
+$3\times 8\times 8$) for the convolutional model.
+
+\section{Feature Aggregation}
+Player statistics are aggregated with \texttt{build\_player\_aggregates}, which
+yields cross-match totals, per-match averages, appearances, and an overall pass
+completion rate, with optional \texttt{split\_by=team} and
+\texttt{split\_by=opponent} breakdowns. For the highlight study, filename parsing
+produced a 98-match results table (50 distinct teams) that supplies the
+supervisory labels (winner, home/away score) for the outcome models.
+
+\section{Match-Outcome Models}
+\paragraph{Tabular model.} \texttt{train\_match\_predictor} fits a multinomial
+logistic-regression winner classifier and two RandomForest regressors for the
+home and away scores, using the five detection-derived features above.
+\paragraph{Convolutional model.} \texttt{train\_match\_predictor\_cnn} builds an
+NPZ of occupancy-grid tensors (grouped by match, with a sliding window of
+sequence length 4) and trains a small CNN winner classifier (PyTorch).
+
+\section{Case Study and Results}
+Over the 98 permitted clips the batch produced \textbf{88,127} detection rows
+(86,007 player detections, 1,541 ball detections) across 7,878 grid frame-rows.
+The tabular model was trained on the resulting 98-match dataset.
+
+\begin{table}[h]
+\centering
+\caption{In-sample results on the 98-match highlight dataset.
+Accuracy is reported against the majority-class baseline to expose the
+limited predictive content of highlight-clip detection aggregates.}
+\label{tab:results}
+\begin{tabular}{lcc}
+\toprule
+Model / metric & Value & Note \\
+\midrule
+Winner accuracy (in-sample) & 48.0\% & majority baseline 49.0\% \\
+Home-score regressor MSE & 0.372 & in-sample \\
+Away-score regressor MSE & 0.204 & in-sample \\
+Detection rows & 88,127 & 86,007 player / 1,541 ball \\
+Grid frame-rows & 7,878 & CNN input \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Honest limitation.} As Table~\ref{tab:results} shows, the highlight
+detection features do \emph{not} outperform the majority-class baseline for
+winner prediction. This is the expected and, we argue, informative result:
+short highlight reels are highlight-selected (not representative of open
+play), contain far fewer frames than a full match, and aggregate detection
+counts are nearly invariant to final score. The pipeline therefore demonstrates
+end-to-end reproducibility and governance, while clearly delineating where
+predictive signal must come from: full-match footage or rich open event data
+(Section~\ref{sec:data}). We report in-sample figures only and do not claim
+generalization.
+
+\section{Reproducibility}
+The study is scripted and re-runnable: \texttt{scripts/process\_highlights\_batch.py}
+(transcode + detect, resumable) and \texttt{scripts/build\_highlights\_training.py}
+(aggregate + fine-tune). A data card and a zipped bundle of the processed tables
+ship with the repository, and every derived table carries lineage and
+\texttt{rights\_reference} fields.
+
+\section{Limitations and Ethics}
+The system intentionally cannot ingest scraped or unlicensed media; researchers
+remain responsible for confirming their own rights to any local footage. The
+modeling results are illustrative and based on a small, highlight-only corpus;
+they are not a predictive claim about match outcomes. No external execution or
+real-money actions are performed.
+
+\section{Conclusion and Future Work}
+We presented a rights-safe, local-first soccer analytics pipeline that turns
+permitted footage and open event data into detection datasets and match-outcome
+models, with a hard, tested rights gate at every footage boundary. Future work
+includes calibrating the detector on full-match footage, adding a feature
+scaler for the classifier, and incorporating open event features (e.g.,
+xT, pressure) as stronger supervisory signal.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+\bibitem[StatsBomb]{statsbomb} StatsBomb. \emph{StatsBomb Open Data}. \url{https://github.com/statsbomb/open-data}.
+\bibitem[Metrica]{metrica} Metrica Sports. \emph{Sample Game Data}. \url{https://github.com/metrica-sports/sample-data}.
+\bibitem[SoccerNet]{soccernet} A. Cioppa et al. \emph{SoccerNet: A Scalable Dataset for Action Spotting in Soccer Videos}. CVPR 2020.
+\bibitem[Redmon]{redmon2016yolo} J. Redmon, S. Divvala, R. Girshick, A. Farhadi. \emph{You Only Look Once: Unified, Real-Time Object Detection}. CVPR 2016.
+\bibitem[Ultralytics]{ultralytics} Ultralytics. \emph{YOLOv8}. \url{https://github.com/ultralytics/ultralytics}.
+\bibitem[scikit]{scikit} F. Pedregosa et al. \emph{Scikit-learn: Machine Learning in Python}. JMLR 2011.
+\bibitem[PyTorch]{pytorch} A. Paszke et al. \emph{PyTorch: An Imperative Style, High-Performance Deep Learning Library}. NeurIPS 2019.
+\end{thebibliography}
+
+\end{document}
