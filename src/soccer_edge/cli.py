@@ -20,6 +20,7 @@ from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.config import get_settings
 from soccer_edge.contact_sheet import write_contact_sheet
 from soccer_edge.correction_merge import merge_reviewed_corrections_from_tables
+from soccer_edge.correction_review_ui import write_correction_review_assets
 from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.dataset_versioning import write_dataset_versions
 from soccer_edge.evaluation.calibration_review import write_calibration_review
@@ -28,6 +29,7 @@ from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.frame_export import export_video_frame_manifest
 from soccer_edge.frame_join import attach_image_paths_from_tables
+from soccer_edge.graph_payload_files import write_annotation_audit_payloads, write_graph_payloads
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
 from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
@@ -54,6 +56,9 @@ from soccer_edge.object_confusion import write_confusion_outputs
 from soccer_edge.object_eval import write_object_eval_metrics
 from soccer_edge.object_model import LocalObjectRunner
 from soccer_edge.object_training import ObjectTrainingConfig, run_object_training
+from soccer_edge.player_stats import write_player_form_features, write_player_match_stats
+from soccer_edge.promotion_gate import write_promotion_gate_report
+from soccer_edge.raw_data_sources import write_raw_data_sources
 from soccer_edge.training_sources import write_training_sources
 from soccer_edge.video.batch_runner import build_processing_plan
 from soccer_edge.video.calibration_io import load_homography
@@ -79,6 +84,18 @@ app.add_typer(examples_app, name="examples")
 
 console = Console()
 logger = get_logger("soccer_edge.cli")
+
+
+def parse_paths(value: str | None) -> list[Path] | None:
+    if value is None:
+        return None
+    return [Path(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def parse_strings(value: str | None) -> list[str] | None:
+    if value is None:
+        return None
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 @app.callback()
@@ -119,6 +136,14 @@ def ingest_soccernet(path: Path = typer.Option(..., exists=False)) -> None:
     """Prepare SoccerNet ingest."""
 
     console.print(run_soccernet_ingest(path))
+
+
+@ingest_app.command("raw-sources")
+def ingest_raw_sources(output: Path = typer.Option(Path("data/processed/raw_data_sources.csv"))) -> None:
+    """Write a rights-aware catalog of candidate raw data sources."""
+
+    path = write_raw_data_sources(output)
+    console.print(f"wrote={path}")
 
 
 @ingest_app.command("write-processed")
@@ -256,9 +281,25 @@ def dataset_versions_command(
 ) -> None:
     """Write deterministic file hashes and table shapes for dataset assets."""
 
-    selected = [Path(item.strip()) for item in paths.split(",") if item.strip()]
+    selected = parse_paths(paths) or []
     path = write_dataset_versions(selected, output)
     console.print(f"wrote={path}")
+
+
+@video_app.command("correction-review")
+def correction_review(
+    source: Path = typer.Option(..., exists=True),
+    html_output: Path = typer.Option(Path("data/processed/correction_review.html")),
+    template_output: Path = typer.Option(Path("data/processed/reviewed_corrections.csv")),
+    keys: str = typer.Option("crop_path"),
+    image_column: str = typer.Option("crop_path"),
+    class_column: str = typer.Option("class_name"),
+) -> None:
+    """Write a correction-review HTML page and CSV template."""
+
+    key_columns = [column.strip() for column in keys.split(",") if column.strip()]
+    paths = write_correction_review_assets(source, html_output, template_output, key_columns, image_column=image_column, class_column=class_column)
+    console.print({name: str(path) for name, path in paths.items()})
 
 
 @video_app.command("merge-corrections")
@@ -424,6 +465,30 @@ def build_inplay_features(
     console.print(f"wrote={output} rows={len(table)}")
 
 
+@features_app.command("player-stats")
+def build_player_stats(
+    events: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/player_match_stats.csv")),
+) -> None:
+    """Build player-match stats from event rows."""
+
+    path = write_player_match_stats(events, output)
+    console.print(f"wrote={path}")
+
+
+@features_app.command("player-form")
+def build_player_form(
+    player_stats: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/player_form.csv")),
+    window: int = typer.Option(5),
+    order_column: str = typer.Option("match_id"),
+) -> None:
+    """Build leakage-safe rolling player form features."""
+
+    path = write_player_form_features(player_stats, output, window=window, order_column=order_column)
+    console.print(f"wrote={path}")
+
+
 @features_app.command("tensor-samples")
 def build_tensor_samples(
     source: Path = typer.Option(..., exists=True),
@@ -526,8 +591,8 @@ def train_local_chain(
 
 @train_app.command("local-finetune")
 def train_local_finetune(
-    input_path: Path = typer.Option(..., "--input", exists=True),
-    object_model_path: Path = typer.Option(..., exists=True),
+    input_path: Path = typer.Option(..., "--input", exists=False),
+    object_model_path: Path = typer.Option(..., exists=False),
     output_dir: Path = typer.Option(Path("data/processed/local_finetune")),
     classes: str = typer.Option("player,ball"),
     base_model_path: Path | None = typer.Option(None, exists=False),
@@ -538,6 +603,7 @@ def train_local_finetune(
     threshold: float = typer.Option(0.5),
     train_object_model: bool = typer.Option(False),
     dry_run_plan: Path | None = typer.Option(None, exists=False),
+    validate_plan_inputs: bool = typer.Option(False),
 ) -> None:
     """Run the local fine-tuning path from frames through optional object training."""
 
@@ -553,10 +619,12 @@ def train_local_finetune(
             max_frames=max_frames,
             threshold=threshold,
             train_fraction=train_fraction,
+            validate_inputs=validate_plan_inputs,
         )
         console.print(f"wrote={plan_path}")
         return
-
+    if not input_path.exists() or not object_model_path.exists():
+        raise typer.BadParameter("--input and --object-model-path must exist unless --dry-run-plan is used")
     class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
     outputs = run_local_finetune_pipeline(
         input_path=input_path,
@@ -712,11 +780,11 @@ def model_card(
     output: Path = typer.Option(Path("MODEL_CARD.md")),
     dataset_id: str | None = typer.Option(None),
     version_paths: str | None = typer.Option(None, help="Optional comma-separated dataset paths to hash."),
+    graph_ids: str | None = typer.Option(None, help="Optional comma-separated graph payload IDs."),
 ) -> None:
     """Write a model card for a saved bundle."""
 
-    selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
-    path = write_model_card(bundle_dir, output, dataset_id=dataset_id, version_paths=selected)
+    path = write_model_card(bundle_dir, output, dataset_id=dataset_id, version_paths=parse_paths(version_paths), graph_ids=parse_strings(graph_ids))
     console.print(f"wrote={path}")
 
 
@@ -728,12 +796,12 @@ def data_card(
     rights_status: str = typer.Option("owned"),
     dataset_id: str | None = typer.Option(None),
     version_paths: str | None = typer.Option(None, help="Optional comma-separated dataset paths to hash."),
+    graph_ids: str | None = typer.Option(None, help="Optional comma-separated graph payload IDs."),
 ) -> None:
     """Write a data card for approved local/open sources."""
 
-    source_paths = [Path(source.strip()) for source in sources.split(",") if source.strip()]
-    selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
-    path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status, dataset_id=dataset_id, version_paths=selected)
+    source_paths = parse_paths(sources) or []
+    path = write_data_card(dataset_name, source_paths, output, rights_status=rights_status, dataset_id=dataset_id, version_paths=parse_paths(version_paths), graph_ids=parse_strings(graph_ids))
     console.print(f"wrote={path}")
 
 
@@ -747,9 +815,8 @@ def auto_data_card(
 ) -> None:
     """Write a data card populated from source catalog and manifest stats."""
 
-    manifest_paths = [Path(item.strip()) for item in manifests.split(",") if item.strip()]
-    version_selected = None if version_paths is None else [Path(item.strip()) for item in version_paths.split(",") if item.strip()]
-    path = write_auto_data_card(dataset_name, manifest_paths, output, rights_status=rights_status, version_paths=version_selected)
+    manifest_paths = parse_paths(manifests) or []
+    path = write_auto_data_card(dataset_name, manifest_paths, output, rights_status=rights_status, version_paths=parse_paths(version_paths))
     console.print(f"wrote={path}")
 
 
@@ -786,6 +853,45 @@ def object_confusion(
 
     paths = write_confusion_outputs(source, table_output, svg_output, actual_column=actual_column, predicted_column=predicted_column)
     console.print({name: str(path) for name, path in paths.items()})
+
+
+@model_app.command("graph-payloads")
+def graph_payloads(
+    source: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/graph_payloads.jsonl")),
+    kind: str = typer.Option(..., help="dataset-version, annotation-audit, or object-evaluation"),
+) -> None:
+    """Write graph payload JSONL for one source table."""
+
+    path = write_graph_payloads(source, output, kind)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("graph-audit-payloads")
+def graph_audit_payloads(
+    audit_dir: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/annotation_audit_payloads.jsonl")),
+) -> None:
+    """Write graph payload JSONL for all annotation audit CSVs."""
+
+    path = write_annotation_audit_payloads(audit_dir, output)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("promotion-gate")
+def promotion_gate(
+    model_card_path: Path | None = typer.Option(None, exists=False),
+    data_card_path: Path | None = typer.Option(None, exists=False),
+    dataset_versions: Path = typer.Option(..., exists=True),
+    audit_dir: Path = typer.Option(..., exists=True),
+    object_metrics: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/promotion_gate.md")),
+    min_f1: float = typer.Option(0.0),
+) -> None:
+    """Validate cards, versions, audits, and object metrics before promotion."""
+
+    path = write_promotion_gate_report(output, model_card_path, data_card_path, dataset_versions, audit_dir, object_metrics, min_f1=min_f1)
+    console.print(f"wrote={path}")
 
 
 @model_app.command("validate-cards")
