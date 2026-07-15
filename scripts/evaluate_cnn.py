@@ -20,7 +20,6 @@ REPO = Path("/home/scott/git/soccer-analytics")
 DET_ROOT = REPO / "data/processed/highlights/detections"
 RESULTS = REPO / "data/processed/highlights/match_results.csv"
 OUT = REPO / "data/processed/highlights/training/cnn_eval"
-OUT.mkdir(parents=True, exist_ok=True)
 
 
 def _limit_threads() -> None:
@@ -53,9 +52,13 @@ def main() -> int:
     parser.add_argument("--max-matches", type=int, default=None, help="cap number of matches loaded (safety)")
     parser.add_argument("--epochs", type=int, default=5, help="CNN training epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="CNN batch size")
+    parser.add_argument("--output-dir", type=str, default=str(OUT), help="output directory for metrics + model")
+    parser.add_argument("--seed", type=int, default=0, help="train/test split random seed")
     args = parser.parse_args()
 
     _limit_threads()
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     results, by_match = load(args.max_matches)
     if not by_match:
@@ -63,9 +66,14 @@ def main() -> int:
         return 1
     print(f"loaded {len(by_match)} matches")
     metrics = evaluate_cnn_out_of_sample(
-        results, by_match, OUT, epochs=args.epochs, batch_size=args.batch_size
+        results,
+        by_match,
+        out_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        random_state=args.seed,
     )
-    (OUT / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
     print("\n=== Highlight-clip CNN (out-of-sample, held-out matches) ===")
     print(f"  train/test matches : {metrics['n_train_matches']} / {metrics['n_test_matches']}")
@@ -73,7 +81,7 @@ def main() -> int:
     print(f"  sequence accuracy  : {metrics['sequence_accuracy']:.3f} (base {metrics['sequence_baseline_accuracy']:.3f})")
     print(f"  match accuracy     : {metrics['match_accuracy']:.3f} (base {metrics['match_baseline_accuracy']:.3f})")
     print(f"  winner Brier       : {metrics['winner_brier']:.3f}")
-    print(f"wrote {OUT / 'metrics.json'}")
+    print(f"wrote {out_dir / 'metrics.json'}")
     return 0
 
 
