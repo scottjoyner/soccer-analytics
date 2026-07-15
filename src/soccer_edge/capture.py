@@ -163,9 +163,25 @@ def _iter_frames(
         raise ValueError(f"unknown capture_source: {capture_source}")
 
 
+def _codec_for_suffix(output: Path, codec: str) -> str:
+    """Pick a fourcc matching the container suffix unless an explicit codec was given."""
+
+    suffix_codec = {
+        ".mp4": "mp4v",
+        ".avi": "XVID",
+        ".mov": "mp4v",
+        ".mkv": "XVID",
+        ".wmv": "WMV2",
+    }
+    if codec != "mp4v":
+        return codec
+    return suffix_codec.get(output.suffix.lower(), "mp4v")
+
+
 def _open_video_writer(output: Path, fps: int, sample_frame, codec: str = "mp4v"):
     import cv2
 
+    codec = _codec_for_suffix(output, codec)
     height, width = sample_frame.shape[:2]
     return cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
 

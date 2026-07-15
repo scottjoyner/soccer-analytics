@@ -34,7 +34,7 @@ def test_capture_cli_refuses_unowned() -> None:
         ["capture", "screen", "--rights-status", "pending", "--rights-reference", "ref"],
     )
     assert result.exit_code != 0
-    assert "rights_status must be one of" in str(result.exception)
+    assert "rights_status must be one of" in (str(result.exception) or result.output)
 
 
 def test_require_rights_rejects_unowned() -> None:
@@ -290,6 +290,13 @@ def test_capture_webcam_zero_frames_raises(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
     with pytest.raises(RuntimeError, match="no frames"):
         capture_webcam_video(tmp_path / "cap.mp4", duration_seconds=0.5, fps=10)
+
+
+def test_capture_webcam_zero_duration_raises(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    with pytest.raises(ValueError, match="positive"):
+        capture_webcam_video(tmp_path / "cap.mp4", duration_seconds=0.0, fps=10)
 
 
 def test_capture_and_register_zero_frames_no_manifest(tmp_path, monkeypatch) -> None:

@@ -99,6 +99,8 @@ def arrange_yolo_dataset(
         warnings.warn(f"{dropped} detection rows dropped: class_name not in {classes}")
     if known.empty:
         raise ValueError("no detections matched the provided classes")
+    if not 0 < train_fraction <= 1:
+        raise ValueError(f"train_fraction must be in (0, 1], got {train_fraction}")
     groups = sorted(known[group_column].dropna().unique().tolist())
     if not groups:
         raise ValueError(f"no non-null values in group column {group_column!r}")

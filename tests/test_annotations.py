@@ -85,3 +85,18 @@ def test_arrange_yolo_dataset_no_image_leakage(tmp_path) -> None:
     all_links = [p.name for p in train_links + val_links]
     assert all_links.count("shared.jpg") == 1, all_links
     assert len(train_links + val_links) == 2
+
+
+def test_arrange_yolo_dataset_rejects_bad_train_fraction(tmp_path) -> None:
+    detections = pd.DataFrame(
+        [
+            {"frame_idx": 1, "class_name": "player", "x1": 0, "y1": 0, "x2": 20, "y2": 10},
+            {"frame_idx": 2, "class_name": "ball", "x1": 5, "y1": 5, "x2": 15, "y2": 15},
+        ]
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="train_fraction"):
+        arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, train_fraction=0.0)
+    with pytest.raises(ValueError, match="train_fraction"):
+        arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, train_fraction=1.5)
