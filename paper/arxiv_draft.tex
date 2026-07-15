@@ -83,11 +83,14 @@ command surface: \texttt{discover video} (metadata only), \texttt{catalog-local}
 \texttt{video plan}, \texttt{detect-yolo}, \texttt{process},
 \texttt{process-local-model}, \texttt{export-frames},
 \texttt{train player-ball}, \texttt{train local-finetune}, and the
-\texttt{capture} intake commands. When a
-manifest row is named, the footage file is opened only if its
-\texttt{rights\_reference} is recorded \emph{and} its \texttt{local\_path}
-matches the input. This makes the rights check a hard, test-covered gate rather
-than documentation.
+\texttt{capture} intake commands. The rights gate is \emph{mandatory} for every
+ footage-processing command: it requires both \texttt{--manifest} and
+ \texttt{--video-id}, and the footage file is opened only if its
+ \texttt{rights\_reference} is recorded, its \texttt{local\_path} \emph{exists},
+ \emph{and} that path matches the input. The underlying \texttt{run\_yolo\_detection}
+ call enforces the same gate internally, so un-gated footage cannot be processed
+ via the library either. This makes the rights check a hard, test-covered gate rather
+ than documentation.
 
 We further harden the gate with a \emph{modality blocklist}
 (\texttt{configs/modality\_rules.json}) enforced inside

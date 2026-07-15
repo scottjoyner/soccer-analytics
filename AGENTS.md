@@ -192,6 +192,18 @@ Completed in recent work:
    (`scripts/evaluate_highlights.py`).
 3. Add a repeated-CV variant of the CNN out-of-sample eval (`--folds`/`--repeats`)
    reporting mean±sd, like the StatsBomb results.
+4. Harden the rights gate: every footage-processing command now requires an
+   approved `--manifest`/`--video-id` (the previous silent no-op when both were
+   omitted was removed), `run_yolo_detection` enforces the same gate internally,
+   and `validate_processable_video` also checks that `local_path` exists.
+5. Harden the promotion gate: the majority baseline is taken from the recorded
+   `baseline_accuracy` when `--majority-baseline-rate` is omitted, and the gate
+   raises instead of silently using a 0.0 baseline when none is available.
+6. Harden capture intake: zero-frame captures raise instead of writing a dangling
+   manifest row, `--duration` must be positive, the video writer is released on
+   error, and the codec is chosen from the output suffix.
+7. Prevent YOLO dataset split leakage: images are grouped by physical file so one
+   image cannot appear in both train and val.
 
 Forward-looking:
 
@@ -208,7 +220,8 @@ Forward-looking:
    `--majority-baseline-rate` is omitted the gate uses the `baseline_accuracy`
    column recorded in the predictive-metrics table (written by
    `eval-to-metrics`), so a no-lift model cannot slip through by forgetting the
-   flag; only if neither is available does it fall back to 0.0 (with a note).
+   flag. If neither a recorded baseline nor an explicit rate is supplied the
+   gate raises rather than passing on a 0.0 baseline.
    The `beats_majority_baseline` and `brier_within_threshold` checks fail the
    gate when a bundle shows no lift or is uncalibrated.
 

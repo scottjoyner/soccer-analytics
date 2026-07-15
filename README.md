@@ -48,9 +48,13 @@ This repository treats data-rights as a system property, not documentation:
 - A single assertion, `assert_processable`, is reused across the command
   surface: `discover video`, `catalog-local`, `video plan`, `detect-yolo`,
   `process`, `process-local-model`, `export-frames`, `train player-ball`,
-  `train local-finetune`, and the `capture` commands. When a manifest row is
-  named, footage is processed only if its `rights_reference` is recorded **and**
-  its `local_path` matches the input.
+  `train local-finetune`, and the `capture` commands. The rights gate is
+  mandatory for every footage-processing command: it requires both
+  `--manifest` and `--video-id`, and footage is opened **only** if its
+  `rights_reference` is recorded, its `local_path` exists, **and** that path
+  matches the input. Passing no manifest is no longer allowed (a silent no-op
+  was removed). `run_yolo_detection` enforces the same gate internally, so
+  un-gated footage cannot be processed via the library either.
 - A **modality blocklist** (`configs/modality_rules.json`) rejects any manifest
   row whose `source_url`/`clip_type` references a blocked modality (`youtube`,
   `youtu.be`, `twitch`, `stream`, or an `http(s)/rtmp/rtsp` scheme), so remote
@@ -130,7 +134,7 @@ soccer-edge video catalog-local --root /path/to/licensed --output manifests/loca
 # 2. plan what is processable (skips rows without a recorded rights_reference)
 soccer-edge video plan --manifest manifests/local_video_manifest.csv --licensed-root /path/to/licensed
 
-# 3. detect players/ball (gate refuses unproven footage)
+# 3. detect players/ball (gate requires an approved --manifest/--video-id; refuses otherwise)
 soccer-edge video detect-yolo --input /path/to/licensed/clip.mp4 --model-path yolov8n.pt \
   --output-dir data/processed/video_yolo --manifest manifests/local_video_manifest.csv --video-id clip
 ```
@@ -156,7 +160,13 @@ soccer-edge capture screen --detect --object-model-path models/yolov8n.pt --anno
   --duration 30 --rights-status owned --rights-reference "personal-recording://self"
 ```
 
-Captures land in `data/raw/video_licensed/captures/`. The command prints the next
+Captures land in `data/raw/video_licensed/captures/`. Robustness: a capture that
+records zero frames (e.g. a closed webcam) raises instead of writing a dangling
+manifest row; `--duration` must be positive (a duration of `0` is no longer
+silently coerced to 10s); the video writer is released on error; and the container
+codec is chosen from the `--output` suffix when the default is used.
+
+The command prints the next
 step — feeding the saved file into `train local-finetune` (or, for `--detect`, the
 detections CSV into `video prepare-object-dataset`).
 
@@ -194,7 +204,10 @@ soccer-edge model promote --bundle-dir <candidate> --promoted-root models/promot
 
 `model promote` exits non-zero and writes nothing when the gate fails, so the
 highlight-clip models (which show no lift) cannot be promoted until a rights-clean
-source yields genuine lift.
+source yields genuine lift. The gate derives the majority baseline from the
+`baseline_accuracy` recorded by `eval-to-metrics` / `model evaluate` when
+`--majority-baseline-rate` is omitted; a no-lift model therefore cannot slip
+through by forgetting the flag.
 
 ---
 
