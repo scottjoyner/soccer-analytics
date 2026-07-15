@@ -80,21 +80,12 @@ def capture_webcam_video(
 ) -> Path:
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    cap = cv2.VideoCapture(device)
-    if not cap.isOpened():
-        raise RuntimeError(f"cannot open webcam device {device}")
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 640)
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 480)
-    writer = cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
-    start = time.time()
-    try:
-        while time.time() - start < duration_seconds:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            writer.write(frame)
-    finally:
-        cap.release()
+    writer = None
+    for frame, _ in _iter_frames("webcam", duration_seconds=duration_seconds, fps=fps, device=device):
+        if writer is None:
+            writer = _open_video_writer(output, fps, frame, codec)
+        writer.write(frame)
+    if writer is not None:
         writer.release()
     return output
 
@@ -108,28 +99,58 @@ def capture_screen_video(
     codec: str = "mp4v",
     mss_module=None,
 ) -> Path:
-    mss = mss_module or _load_mss()
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    with mss.mss() as sct:
-        monitors = sct.monitors
-        if region is not None:
-            capture_area = region
-        else:
-            index = monitor if monitor < len(monitors) else len(monitors) - 1
-            capture_area = monitors[index]
-        width = int(capture_area.get("width", capture_area.get("w", 640)))
-        height = int(capture_area.get("height", capture_area.get("h", 480)))
-        writer = cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
-        start = time.time()
+    writer = None
+    for frame, _ in _iter_frames(
+        "screen", duration_seconds=duration_seconds, fps=fps, monitor=monitor, region=region, mss_module=mss_module
+    ):
+        if writer is None:
+            writer = _open_video_writer(output, fps, frame, codec)
+        writer.write(frame)
+    if writer is not None:
+        writer.release()
+    return output
+
+
+def _iter_frames(
+    capture_source: str,
+    *,
+    duration_seconds: float,
+    fps: int = 20,
+    monitor: int = 1,
+    region: dict | None = None,
+    device: int = 0,
+    mss_module=None,
+):
+    start = time.time()
+    if capture_source == "webcam":
+        cap = cv2.VideoCapture(device)
+        if not cap.isOpened():
+            raise RuntimeError(f"cannot open webcam device {device}")
         try:
             while time.time() - start < duration_seconds:
-                shot = sct.grab(capture_area)
-                array = _mss_to_bgr(shot)
-                writer.write(array)
+                ok, frame = cap.read()
+                if not ok:
+                    break
+                yield frame, time.time() - start
         finally:
-            writer.release()
-    return output
+            cap.release()
+    elif capture_source == "screen":
+        mss = mss_module or _load_mss()
+        with mss.mss() as sct:
+            monitors = sct.monitors
+            capture_area = region if region is not None else monitors[min(monitor, len(monitors) - 1)]
+            while time.time() - start < duration_seconds:
+                shot = sct.grab(capture_area)
+                yield _mss_to_bgr(shot), time.time() - start
+    else:
+        raise ValueError(f"unknown capture_source: {capture_source}")
+
+
+def _open_video_writer(output: Path, fps: int, sample_frame, codec: str = "mp4v"):
+    height, width = sample_frame.shape[:2]
+    return cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
 
 
 def capture_screen_image(output: Path, monitor: int = 1, region: dict | None = None, mss_module=None) -> Path:
@@ -150,6 +171,170 @@ def _mss_to_bgr(shot) -> object:
     width = int(getattr(shot, "width", getattr(shot, "size", (0, 0))[0]))
     array = np.frombuffer(shot.rgb, dtype=np.uint8).reshape((height, width, 3))
     return cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+
+
+DETECTION_CSV_COLUMNS = ["frame_idx", "timestamp_seconds", "class_name", "confidence", "x1", "y1", "x2", "y2"]
+
+
+def _write_detections_csv(detections: list[dict], output: Path) -> Path:
+    import pandas as pd
+
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(detections, columns=DETECTION_CSV_COLUMNS)
+    frame.to_csv(output, index=False)
+    return output
+
+
+def _draw_boxes(frame, rows: list[dict]):
+    annotated = frame.copy()
+    for row in rows:
+        x1, y1, x2, y2 = int(row["x1"]), int(row["y1"]), int(row["x2"]), int(row["y2"])
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        label = f"{row['class_name']} {float(row['confidence']):.2f}"
+        cv2.putText(annotated, label, (x1, max(y1 - 5, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    return annotated
+
+
+def capture_and_detect(
+    capture_source: str,
+    *,
+    model_path=None,
+    runner=None,
+    duration_seconds: float | None = None,
+    fps: int = 20,
+    monitor: int = 1,
+    region: dict | None = None,
+    device: int = 0,
+    output_video: Path | None = None,
+    detections_output: Path,
+    annotate: bool = False,
+    codec: str = "mp4v",
+    mss_module=None,
+) -> dict[str, Path]:
+    """Capture a video source while running live object detection on each frame.
+
+    Writes a detections table (``frame_idx``, ``timestamp_seconds``, ``class_name``,
+    ``confidence``, box coordinates) and, optionally, an annotated video. The
+    footage is therefore processed as it is captured, not only after saving.
+    """
+
+    from soccer_edge.object_model import LocalObjectRunner
+
+    if runner is None:
+        if model_path is None:
+            raise ValueError("model_path or runner is required for detection")
+        runner = LocalObjectRunner(model_path)
+
+    detections: list[dict] = []
+    writer = None
+    frame_idx = 0
+    for frame, elapsed in _iter_frames(
+        capture_source,
+        duration_seconds=duration_seconds if duration_seconds is not None else 10.0,
+        fps=fps,
+        monitor=monitor,
+        region=region,
+        device=device,
+        mss_module=mss_module,
+    ):
+        rows = runner(frame)
+        for row in rows:
+            detections.append(
+                {
+                    "frame_idx": frame_idx,
+                    "timestamp_seconds": round(elapsed, 3),
+                    "class_name": row["class_name"],
+                    "confidence": float(row["confidence"]),
+                    "x1": float(row["x1"]),
+                    "y1": float(row["y1"]),
+                    "x2": float(row["x2"]),
+                    "y2": float(row["y2"]),
+                }
+            )
+        display = _draw_boxes(frame, rows) if annotate else frame
+        if output_video is not None:
+            if writer is None:
+                writer = _open_video_writer(output_video, fps, display, codec)
+            writer.write(display)
+        frame_idx += 1
+    if writer is not None:
+        writer.release()
+    detections_path = _write_detections_csv(detections, detections_output)
+    return {"video": Path(output_video) if output_video is not None else None, "detections": detections_path}
+
+
+def capture_and_detect_and_register(
+    capture_source: str,
+    output: Path,
+    *,
+    model_path=None,
+    runner=None,
+    duration_seconds: float | None = None,
+    fps: int = 20,
+    monitor: int = 1,
+    region: dict | None = None,
+    device: int = 0,
+    detections_output: Path,
+    annotate: bool = False,
+    manifest_path: Path = Path("manifests/video_manifest.csv"),
+    rights_status: str,
+    rights_reference: str,
+    video_id: str | None = None,
+    clip_type: str = "training_clip",
+    match_id: str = "",
+    competition: str = "",
+    season: str = "",
+    home_team: str = "",
+    away_team: str = "",
+    period: str = "",
+    start_match_second: float | None = None,
+    end_match_second: float | None = None,
+    notes: str = "",
+    codec: str = "mp4v",
+    mss_module=None,
+) -> tuple[Path, Path, VideoManifestRow]:
+    if capture_source == "image":
+        raise ValueError("live detection requires a video source (screen/webcam), not image")
+    result = capture_and_detect(
+        capture_source,
+        model_path=model_path,
+        runner=runner,
+        duration_seconds=duration_seconds,
+        fps=fps,
+        monitor=monitor,
+        region=region,
+        device=device,
+        output_video=output,
+        detections_output=detections_output,
+        annotate=annotate,
+        codec=codec,
+        mss_module=mss_module,
+    )
+    saved_video = result["video"]
+    detections_path = result["detections"]
+    resolved_video_id = video_id or f"capture-{_utc_stamp()}"
+    row = build_capture_row(
+        video_id=resolved_video_id,
+        local_path=saved_video,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        capture_source=capture_source,
+        clip_type=clip_type,
+        match_id=match_id,
+        competition=competition,
+        season=season,
+        home_team=home_team,
+        away_team=away_team,
+        period=period,
+        start_match_second=start_match_second,
+        end_match_second=end_match_second,
+        notes=notes,
+    )
+    from soccer_edge.video.manifest import append_manifest_row
+
+    append_manifest_row(manifest_path, row)
+    return saved_video, detections_path, row
 
 
 def build_capture_row(

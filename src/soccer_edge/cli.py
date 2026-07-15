@@ -30,7 +30,13 @@ from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.frame_export import export_video_frame_manifest
 from soccer_edge.frame_join import attach_image_paths_from_tables
-from soccer_edge.capture import _require_rights, capture_and_register, default_capture_output, parse_region
+from soccer_edge.capture import (
+    _require_rights,
+    capture_and_detect_and_register,
+    capture_and_register,
+    default_capture_output,
+    parse_region,
+)
 from soccer_edge.graph_payload_files import write_annotation_audit_payloads, write_graph_payloads
 from soccer_edge.ingest.football_data_loader import ingest_football_data as run_football_data_ingest
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
@@ -1509,39 +1515,81 @@ def _run_capture(
     notes: str,
     manifest: Path,
     suffix: str,
+    detect: bool = False,
+    object_model_path: Path | None = None,
+    detections_output: Path | None = None,
+    annotate: bool = False,
 ) -> None:
     console.print(CAPTURE_SAFETY_NOTE)
     _require_rights(rights_status, rights_reference)
+    if capture_source == "image" and detect:
+        raise typer.BadParameter("live detection is not available for image captures")
     out = output or default_capture_output(capture_source, suffix)
     region_dict = parse_region(region)
-    saved, row = capture_and_register(
-        capture_source,
-        out,
-        duration_seconds=duration,
-        fps=fps,
-        monitor=monitor,
-        region=region_dict,
-        device=device,
-        manifest_path=manifest,
-        rights_status=rights_status,
-        rights_reference=rights_reference,
-        video_id=video_id,
-        clip_type=clip_type,
-        match_id=match_id,
-        competition=competition,
-        season=season,
-        home_team=home_team,
-        away_team=away_team,
-        period=period,
-        notes=notes,
-    )
-    console.print(f"captured={saved}")
-    console.print(f"manifest={manifest} video_id={row.video_id}")
-    console.print(
-        "next: soccer-edge train local-finetune --input "
-        f"{saved} --manifest {manifest} --video-id {row.video_id} "
-        "--object-model-path models/yolov8n.pt"
-    )
+    if detect:
+        if object_model_path is None:
+            raise typer.BadParameter("--object-model-path is required when --detect is set")
+        det_out = detections_output or Path("data/processed/captured_detections.csv")
+        saved_video, detections_path, row = capture_and_detect_and_register(
+            capture_source,
+            out,
+            model_path=object_model_path,
+            duration_seconds=duration,
+            fps=fps,
+            monitor=monitor,
+            region=region_dict,
+            device=device,
+            detections_output=det_out,
+            annotate=annotate,
+            manifest_path=manifest,
+            rights_status=rights_status,
+            rights_reference=rights_reference,
+            video_id=video_id,
+            clip_type=clip_type,
+            match_id=match_id,
+            competition=competition,
+            season=season,
+            home_team=home_team,
+            away_team=away_team,
+            period=period,
+            notes=notes,
+        )
+        console.print(f"captured={saved_video}")
+        console.print(f"detections={detections_path}")
+        console.print(f"manifest={manifest} video_id={row.video_id}")
+        console.print(
+            "next: soccer-edge video prepare-object-dataset --source "
+            f"{detections_path} --output-dir data/processed/captured_yolo --classes player,ball"
+        )
+    else:
+        saved, row = capture_and_register(
+            capture_source,
+            out,
+            duration_seconds=duration,
+            fps=fps,
+            monitor=monitor,
+            region=region_dict,
+            device=device,
+            manifest_path=manifest,
+            rights_status=rights_status,
+            rights_reference=rights_reference,
+            video_id=video_id,
+            clip_type=clip_type,
+            match_id=match_id,
+            competition=competition,
+            season=season,
+            home_team=home_team,
+            away_team=away_team,
+            period=period,
+            notes=notes,
+        )
+        console.print(f"captured={saved}")
+        console.print(f"manifest={manifest} video_id={row.video_id}")
+        console.print(
+            "next: soccer-edge train local-finetune --input "
+            f"{saved} --manifest {manifest} --video-id {row.video_id} "
+            "--object-model-path models/yolov8n.pt"
+        )
 
 
 @capture_app.command("screen")
@@ -1550,6 +1598,10 @@ def capture_screen_cmd(
     fps: int = typer.Option(20),
     monitor: int = typer.Option(1),
     region: str | None = typer.Option(None, help="Optional 'left,top,width,height'."),
+    detect: bool = typer.Option(False, help="Run live YOLO detection while capturing."),
+    object_model_path: Path | None = typer.Option(None, help="YOLO weights when --detect is set."),
+    detections_output: Path | None = typer.Option(None, help="Detections CSV output when --detect is set."),
+    annotate: bool = typer.Option(False, help="Draw detection boxes onto the saved video."),
     output: Path | None = typer.Option(None),
     rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
     rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
@@ -1586,6 +1638,10 @@ def capture_screen_cmd(
         period=period,
         notes=notes,
         manifest=manifest,
+        detect=detect,
+        object_model_path=object_model_path,
+        detections_output=detections_output,
+        annotate=annotate,
         suffix=".mp4",
     )
 
@@ -1595,6 +1651,10 @@ def capture_webcam_cmd(
     duration: float = typer.Option(10.0),
     fps: int = typer.Option(20),
     device: int = typer.Option(0),
+    detect: bool = typer.Option(False, help="Run live YOLO detection while capturing."),
+    object_model_path: Path | None = typer.Option(None, help="YOLO weights when --detect is set."),
+    detections_output: Path | None = typer.Option(None, help="Detections CSV output when --detect is set."),
+    annotate: bool = typer.Option(False, help="Draw detection boxes onto the saved video."),
     output: Path | None = typer.Option(None),
     rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
     rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
@@ -1631,6 +1691,10 @@ def capture_webcam_cmd(
         period=period,
         notes=notes,
         manifest=manifest,
+        detect=detect,
+        object_model_path=object_model_path,
+        detections_output=detections_output,
+        annotate=annotate,
         suffix=".mp4",
     )
 

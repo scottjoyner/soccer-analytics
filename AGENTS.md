@@ -103,6 +103,16 @@ data rules). After capture, feed the saved file straight into the rights-gated p
 soccer-edge train local-finetune --input <saved_file> --manifest manifests/video_manifest.csv --video-id <video_id> --object-model-path models/yolov8n.pt
 ```
 
+Real-time detection while capturing: add `--detect` with a YOLO weights path to run
+object detection on each frame as it is recorded (processed as it is captured, not only
+after saving). It writes a detections table (`frame_idx`, `timestamp_seconds`, `class_name`,
+`confidence`, box coordinates) and optionally an annotated video via `--annotate`:
+
+```bash
+soccer-edge capture screen --detect --object-model-path models/yolov8n.pt --annotate --duration 30 --fps 20 --rights-status owned --rights-reference "license-abc"
+soccer-edge capture webcam --detect --object-model-path models/yolov8n.pt --duration 30 --device 0 --rights-status owned --rights-reference "license-abc"
+```
+
 Generate dataset metadata and evaluate object detections:
 
 ```bash

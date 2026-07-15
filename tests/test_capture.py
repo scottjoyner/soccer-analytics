@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 import cv2
@@ -7,6 +8,7 @@ from pathlib import Path
 from soccer_edge.capture import (
     _require_rights,
     build_capture_row,
+    capture_and_detect,
     capture_and_register,
     capture_screen_image,
     capture_webcam_video,
@@ -201,3 +203,68 @@ def test_manifest_row_passes_rights_gate(tmp_path) -> None:
     )
     with pytest.raises(ValueError):
         validate_processable_video(pending, licensed)
+
+
+class _FakeRunner:
+    def __init__(self, model_path=None) -> None:
+        self.calls = 0
+
+    def __call__(self, frame):
+        self.calls += 1
+        return [{"class_name": "person", "confidence": 0.9, "x1": 10.0, "y1": 10.0, "x2": 50.0, "y2": 50.0}]
+
+
+def test_capture_and_detect_writes_detections(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    det = tmp_path / "det.csv"
+    vid = tmp_path / "cap.mp4"
+    result = capture_and_detect(
+        "webcam",
+        runner=_FakeRunner(),
+        duration_seconds=0.2,
+        fps=10,
+        output_video=vid,
+        detections_output=det,
+        annotate=True,
+    )
+    assert result["video"] == vid
+    assert det.exists()
+    frame = pd.read_csv(det)
+    assert list(frame.columns) == ["frame_idx", "timestamp_seconds", "class_name", "confidence", "x1", "y1", "x2", "y2"]
+    assert len(frame) == 3
+    assert frame.iloc[0]["class_name"] == "person"
+
+
+def test_capture_cli_detect(tmp_path, monkeypatch) -> None:
+    import soccer_edge.object_model as object_model_module
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    monkeypatch.setattr(object_model_module, "LocalObjectRunner", _FakeRunner)
+    manifest = tmp_path / "manifests" / "video_manifest.csv"
+    result = runner.invoke(
+        app,
+        [
+            "capture",
+            "webcam",
+            "--detect",
+            "--object-model-path",
+            "models/yolov8n.pt",
+            "--rights-status",
+            "owned",
+            "--rights-reference",
+            "ref1",
+            "--duration",
+            "0.2",
+            "--detections-output",
+            str(tmp_path / "det.csv"),
+            "--output",
+            str(tmp_path / "cap.mp4"),
+            "--manifest",
+            str(manifest),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "det.csv").exists()
+    assert len(read_video_manifest(manifest)) == 1
