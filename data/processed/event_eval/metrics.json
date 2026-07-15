@@ -1,0 +1,15 @@
+{
+  "n_matches": 380,
+  "n_splits": 5,
+  "n_repeats": 10,
+  "winner_accuracy_mean": 0.633157894736842,
+  "winner_accuracy_std": 0.029142880420857116,
+  "winner_brier_mean": 0.1638962115870487,
+  "winner_brier_std": 0.007141974833759805,
+  "majority_baseline_accuracy_mean": 0.41315789473684217,
+  "majority_baseline_accuracy_std": 0.006446025638903094,
+  "home_score_mse_mean": 0.9566272631578947,
+  "home_score_mse_std": 0.1600139217917531,
+  "away_score_mse_mean": 0.8704391052631579,
+  "away_score_mse_std": 0.14620939055819535
+}
