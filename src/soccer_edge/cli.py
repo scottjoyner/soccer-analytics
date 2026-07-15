@@ -24,6 +24,7 @@ from soccer_edge.correction_review_ui import write_correction_review_assets
 from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.dataset_versioning import write_dataset_versions
 from soccer_edge.evaluation.calibration_review import write_calibration_review
+from soccer_edge.evaluation.promotion_metrics import write_predictive_metrics
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
@@ -1226,6 +1227,18 @@ def promotion_gate(
         min_accuracy_lift=min_accuracy_lift,
         max_brier=max_brier,
     )
+    console.print(f"wrote={path}")
+
+
+@model_app.command("eval-to-metrics")
+def eval_to_metrics(
+    metrics_json: Path = typer.Option(..., exists=True),
+    output: Path = typer.Option(Path("data/processed/predictive_metrics.csv")),
+    model_name: str | None = typer.Option(None),
+) -> None:
+    """Convert an eval metrics.json into a promotion-gate predictive metrics CSV."""
+
+    path = write_predictive_metrics(metrics_json, output, model_name=model_name)
     console.print(f"wrote={path}")
 
 

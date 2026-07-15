@@ -178,6 +178,23 @@ Forward-looking:
    `--max-brier`. The `beats_majority_baseline` and `brier_within_threshold`
    checks fail the gate when a bundle shows no lift or is uncalibrated.
 
+   The eval scripts emit a `metrics.json` whose schema differs per script. Normalize
+   it into the promotion-gate predictive metrics table with:
+
+   ```bash
+   soccer-edge model eval-to-metrics --metrics-json <OUT_ROOT>/metrics.json --output data/processed/predictive_metrics.csv --model-name cnn-v1
+   ```
+
+   Then run the gate:
+
+   ```bash
+   soccer-edge model promotion-gate \
+     --model-card-path <model_card> --data-card-path <data_card> \
+     --dataset-versions <versions.csv> --audit-dir <audit_dir> --object-metrics <obj_metrics.csv> \
+     --predictive-metrics data/processed/predictive_metrics.csv \
+     --majority-baseline-rate 0.50 --min-accuracy-lift 0.02 --max-brier 0.50
+   ```
+
 ## Quality gates
 
 Before committing new work, run:
