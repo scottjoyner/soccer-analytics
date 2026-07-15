@@ -42,7 +42,7 @@ def test_ingest_write_processed_command(tmp_path) -> None:
     (source / "RawEvents.csv").write_text("event_id,type\n1,pass\n", encoding="utf-8")
     result = runner.invoke(
         app,
-        ["ingest", "write-processed", "--source", str(source), "--output-dir", str(output), "--source-type", "metrica"],
+        ["ingest", "write-processed", "--source", str(source), "--output-dir", str(output), "--source-type", "metrica", "--dataset-version", "v1"],
     )
     assert result.exit_code == 0
     assert (output / "metrica_events.parquet").exists()

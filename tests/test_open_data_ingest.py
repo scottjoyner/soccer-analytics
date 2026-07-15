@@ -131,7 +131,7 @@ def test_cli_write_processed_open_data(tmp_path) -> None:
     of_output = tmp_path / "of_output"
     result = runner.invoke(
         app,
-        ["ingest", "write-processed", "--source", str(of_source), "--output-dir", str(of_output), "--source-type", "openfootball"],
+        ["ingest", "write-processed", "--source", str(of_source), "--output-dir", str(of_output), "--source-type", "openfootball", "--dataset-version", "v1"],
     )
     assert result.exit_code == 0
     assert (of_output / "openfootball_matches.parquet").exists()
@@ -139,7 +139,7 @@ def test_cli_write_processed_open_data(tmp_path) -> None:
     fd_output = tmp_path / "fd_output"
     result = runner.invoke(
         app,
-        ["ingest", "write-processed", "--source", str(fd_source), "--output-dir", str(fd_output), "--source-type", "football-data"],
+        ["ingest", "write-processed", "--source", str(fd_source), "--output-dir", str(fd_output), "--source-type", "football-data", "--dataset-version", "v1"],
     )
     assert result.exit_code == 0
     assert (fd_output / "football_data_matches.parquet").exists()

@@ -87,6 +87,23 @@ def test_arrange_yolo_dataset_no_image_leakage(tmp_path) -> None:
     assert len(train_links + val_links) == 2
 
 
+def test_arrange_yolo_dataset_remaps_class_aliases(tmp_path) -> None:
+    detections = pd.DataFrame(
+        [
+            {"frame_idx": 1, "class_name": "person", "x1": 0, "y1": 0, "x2": 20, "y2": 10},
+            {"frame_idx": 1, "class_name": "sports ball", "x1": 5, "y1": 5, "x2": 15, "y2": 15},
+            {"frame_idx": 2, "class_name": "bird", "x1": 1, "y1": 1, "x2": 9, "y2": 9},
+        ]
+    )
+    aliases = {"person": "player", "sports ball": "ball"}
+    paths = arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, class_aliases=aliases)
+    train_txt = (tmp_path / "yolo" / "labels" / "train" / "1.txt").read_text(encoding="utf-8").strip().splitlines()
+    # person->player (id 0) and sports ball->ball (id 1) survive; bird is dropped.
+    assert len(train_txt) == 2
+    assert train_txt[0].startswith("0 ")
+    assert train_txt[1].startswith("1 ")
+
+
 def test_arrange_yolo_dataset_rejects_bad_train_fraction(tmp_path) -> None:
     detections = pd.DataFrame(
         [

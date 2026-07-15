@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import warnings
 from pathlib import Path
 from typing import Iterator
 
@@ -22,11 +23,16 @@ def iter_media_samples(input_path: Path, stride: int = 1, max_samples: int | Non
     rate = float(handle.get(reader.CAP_PROP_FPS) or 0.0)
     index = 0
     emitted = 0
+    read_count = 0
+    failed_after_frames = False
     try:
         while True:
             ok, data = handle.read()
             if not ok:
+                if read_count > 0:
+                    failed_after_frames = True
                 break
+            read_count += 1
             if index % stride == 0:
                 seconds = index / rate if rate > 0 else float(index)
                 yield MediaSample(index=index, time_seconds=seconds, data=data)
@@ -36,3 +42,12 @@ def iter_media_samples(input_path: Path, stride: int = 1, max_samples: int | Non
             index += 1
     finally:
         handle.release()
+    # A read that fails after frames were produced (rather than a clean EOF) often
+    # means the stream was truncated/corrupt; surface it instead of silently
+    # producing short, wrong detection tables.
+    if failed_after_frames:
+        warnings.warn(
+            f"media stream ended early after {read_count} successful read(s); "
+            "output may be truncated.",
+            stacklevel=2,
+        )

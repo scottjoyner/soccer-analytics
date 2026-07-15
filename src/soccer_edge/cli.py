@@ -199,7 +199,7 @@ def ingest_write_processed(
     source: Path = typer.Option(..., exists=True),
     output_dir: Path = typer.Option(Path("data/processed/ingest")),
     source_type: str = typer.Option(..., help="statsbomb, metrica, soccernet, openfootball, or football-data"),
-    dataset_version: str = typer.Option("unknown"),
+    dataset_version: str = typer.Option(..., help="Dataset/source version for lineage (required; no silent default)."),
 ) -> None:
     """Write local source files into processed parquet tables with lineage."""
 

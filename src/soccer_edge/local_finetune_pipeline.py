@@ -69,6 +69,7 @@ def run_local_finetune_pipeline(
     train_object_model: bool = False,
     object_epochs: int = 50,
     object_image_size: int = 640,
+    class_aliases: dict[str, str] | None = None,
 ) -> LocalFinetuneOutputs:
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs = local_finetune_outputs(output_dir)
@@ -93,7 +94,7 @@ def run_local_finetune_pipeline(
     write_low_confidence_rows(outputs.detections_with_images, outputs.low_confidence, threshold=threshold)
     export_image_crops_from_table(outputs.low_confidence, crops_dir, outputs.crop_manifest)
     write_contact_sheet(outputs.crop_manifest, outputs.contact_sheet)
-    write_detection_annotations_from_table(outputs.detections_with_images, outputs.annotations_dir, classes, image_width, image_height)
+    write_detection_annotations_from_table(outputs.detections_with_images, outputs.annotations_dir, classes, image_width, image_height, class_aliases=class_aliases)
     write_annotation_split(outputs.detections_with_images, outputs.train_annotations, outputs.val_annotations, train_fraction=train_fraction)
     arrange_yolo_dataset_from_table(
         outputs.detections_with_images,
@@ -103,6 +104,7 @@ def run_local_finetune_pipeline(
         image_height,
         train_fraction=train_fraction,
         image_column="image_path",
+        class_aliases=class_aliases,
     )
     write_auto_data_card(
         dataset_name="local-finetune-dataset",

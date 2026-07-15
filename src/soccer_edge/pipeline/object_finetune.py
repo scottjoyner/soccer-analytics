@@ -13,6 +13,9 @@ from pathlib import Path
 from soccer_edge.local_finetune_pipeline import LocalFinetuneOutputs, run_local_finetune_pipeline
 
 SOCCER_CLASSES = ["player", "ball"]
+# YOLO/COCO models emit these names; map them onto the soccer classes so
+# real detections are not silently dropped by the class filter.
+COCO_TO_SOCCER = {"person": "player", "sports ball": "ball"}
 
 
 def run_player_ball_finetune(
@@ -30,6 +33,7 @@ def run_player_ball_finetune(
     train_object_model: bool = True,
     object_epochs: int = 50,
     object_image_size: int = 640,
+    class_aliases: dict[str, str] | None = None,
 ) -> LocalFinetuneOutputs:
     return run_local_finetune_pipeline(
         input_path=input_path,
@@ -47,4 +51,5 @@ def run_player_ball_finetune(
         train_object_model=train_object_model,
         object_epochs=object_epochs,
         object_image_size=object_image_size,
+        class_aliases=class_aliases if class_aliases is not None else dict(COCO_TO_SOCCER),
     )

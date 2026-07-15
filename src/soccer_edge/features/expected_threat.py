@@ -21,7 +21,7 @@ PITCH_LENGTH = 120.0
 PITCH_WIDTH = 80.0
 
 
-def loc_to_cell(x: float, y: float) -> int:
+def loc_to_cell(x: float | None, y: float | None) -> int:
     """Map a StatsBomb pitch location to a flat cell index."""
     if x is None or y is None:
         return -1

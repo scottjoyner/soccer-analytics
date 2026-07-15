@@ -27,6 +27,16 @@ def normalized_box_line(
     return f"{class_id} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}"
 
 
+def _remap_classes(frame: pd.DataFrame, class_column: str, class_aliases: dict[str, str] | None) -> pd.DataFrame:
+    if not class_aliases:
+        return frame
+    frame = frame.copy()
+    frame[class_column] = frame[class_column].astype(str).map(
+        lambda name: class_aliases.get(name, name)
+    )
+    return frame
+
+
 def build_class_index(classes: list[str]) -> dict[str, int]:
     return {class_name: idx for idx, class_name in enumerate(classes)}
 
@@ -39,9 +49,11 @@ def write_detection_annotations(
     image_height: float,
     frame_column: str = "frame_idx",
     class_column: str = "class_name",
+    class_aliases: dict[str, str] | None = None,
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     class_to_id = build_class_index(classes)
+    detections = _remap_classes(detections, class_column, class_aliases)
     known = detections[detections[class_column].isin(classes)]
     paths: dict[str, Path] = {}
     for frame_id, group in known.groupby(frame_column):
@@ -60,9 +72,14 @@ def write_detection_annotations_from_table(
     classes: list[str],
     image_width: float,
     image_height: float,
+    class_column: str = "class_name",
+    class_aliases: dict[str, str] | None = None,
 ) -> dict[str, Path]:
     frame = pd.read_parquet(source) if source.suffix == ".parquet" else pd.read_csv(source)
-    return write_detection_annotations(frame, output_dir, classes, image_width, image_height)
+    return write_detection_annotations(
+        frame, output_dir, classes, image_width, image_height,
+        class_column=class_column, class_aliases=class_aliases,
+    )
 
 
 def arrange_yolo_dataset(
@@ -76,6 +93,7 @@ def arrange_yolo_dataset(
     image_column: str = "image_path",
     class_column: str = "class_name",
     link_images: bool = True,
+    class_aliases: dict[str, str] | None = None,
 ) -> dict[str, Path]:
     """Arrange detection rows into a YOLO dataset layout for ultralytics training.
 
@@ -86,6 +104,7 @@ def arrange_yolo_dataset(
 
     output_dir = Path(output_dir)
     class_to_id = build_class_index(classes)
+    detections = _remap_classes(detections, class_column, class_aliases)
     images_train = output_dir / "images" / "train"
     images_val = output_dir / "images" / "val"
     labels_train = output_dir / "labels" / "train"
@@ -181,6 +200,7 @@ def arrange_yolo_dataset_from_table(
     image_column: str = "image_path",
     class_column: str = "class_name",
     link_images: bool = True,
+    class_aliases: dict[str, str] | None = None,
 ) -> dict[str, Path]:
     frame = pd.read_parquet(source) if source.suffix == ".parquet" else pd.read_csv(source)
     return arrange_yolo_dataset(
@@ -194,4 +214,5 @@ def arrange_yolo_dataset_from_table(
         image_column=image_column,
         class_column=class_column,
         link_images=link_images,
+        class_aliases=class_aliases,
     )

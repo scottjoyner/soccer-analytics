@@ -11,5 +11,5 @@ class MissingTorchError(RuntimeError):
 
 
 def require_torch() -> None:
-    if torch is None or nn is None:
+    if torch is None or nn is None:  # type: ignore[redundant-expr]
         raise MissingTorchError("Install optional ML dependencies with: pip install -r requirements-ml.txt")
