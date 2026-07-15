@@ -15,6 +15,20 @@ import pandas as pd
 PLAYER_CLASSES = {"player", "person"}
 BALL_CLASSES = {"ball", "sports ball"}
 NEAR_BALL_FRACTION = 0.06  # proximity radius as a fraction of video width
+CONTROL_RADIUS_FRACTION = 0.08  # ball is "controlled" when a player is within this radius
+PRESSURE_RADIUS_FRACTION = 0.12  # ball-proximity pressure radius
+PRESSURE_HIGH_COUNT = 3  # players within pressure radius counted as a high-pressure frame
+
+POSSESSION_KEYS = [
+    "possession_frame_rate",
+    "n_possession_chains",
+    "mean_chain_frames",
+    "max_chain_frames",
+    "contested_possession_rate",
+    "pressure_mean",
+    "pressure_high_rate",
+    "pressure_max",
+]
 
 
 def _center(df: pd.DataFrame) -> pd.DataFrame:
@@ -23,6 +37,87 @@ def _center(df: pd.DataFrame) -> pd.DataFrame:
     out["cy"] = (out["y1"] + out["y2"]) / 2.0
     out["area"] = (out["x2"] - out["x1"]) * (out["y1"] - out["y2"]).abs()
     return out
+
+
+def _contiguous_chains(frame_indices: list[int]) -> list[list[int]]:
+    """Group sorted frame indices into runs of consecutive frames."""
+    if not frame_indices:
+        return []
+    chains: list[list[int]] = []
+    start = prev = frame_indices[0]
+    for fid in frame_indices[1:]:
+        if fid == prev + 1:
+            prev = fid
+            continue
+        chains.append(list(range(start, prev + 1)))
+        start = prev = fid
+    chains.append(list(range(start, prev + 1)))
+    return chains
+
+
+def build_possession_features(
+    detections: pd.DataFrame,
+    video_width: float = 1920.0,
+    video_height: float = 1080.0,
+) -> dict:
+    """Tracking-derived possession and ball-proximity pressure features.
+
+    Without a team tracker, "possession" is approximated as frames where a player
+    box is within a control radius of the ball; a possession chain is a maximal run
+    of consecutive controlled frames. Ball-proximity pressure counts how many
+    player boxes sit inside a wider pressure radius of the ball on each ball frame.
+    All values are either rates or counts, so they are resolution independent.
+    """
+    if detections is None or len(detections) == 0:
+        return {k: 0.0 for k in POSSESSION_KEYS}
+
+    df = _center(detections)
+    classes = df["class_name"].astype(str).str.lower()
+    players = df[classes.isin(PLAYER_CLASSES)]
+    balls = df[classes.isin(BALL_CLASSES)]
+
+    n_frames = int(df["frame_idx"].nunique())
+    if len(balls) == 0:
+        return {k: 0.0 for k in POSSESSION_KEYS}
+
+    control_radius = CONTROL_RADIUS_FRACTION * video_width
+    pressure_radius = PRESSURE_RADIUS_FRACTION * video_width
+
+    per_frame_ball = balls.groupby("frame_idx")[["cx", "cy"]].mean()
+    per_frame_players = {
+        fid: players[players["frame_idx"] == fid][["cx", "cy"]].values
+        for fid in per_frame_ball.index
+    }
+
+    controlled: list[int] = []
+    pressure_counts: list[int] = []
+    contested_control = 0
+    for fid in per_frame_ball.index:
+        bc = per_frame_ball.loc[fid].values
+        pcs = per_frame_players.get(fid, [])
+        if len(pcs) == 0:
+            continue
+        dists = (((pcs - bc) ** 2).sum(axis=1) ** 0.5)
+        pressure_counts.append(int((dists < pressure_radius).sum()))
+        if dists.min() < control_radius:
+            controlled.append(fid)
+            if pressure_counts[-1] >= 2:
+                contested_control += 1
+
+    possession_frame_rate = len(controlled) / max(n_frames, 1)
+    chain_lengths = [len(chain) for chain in _contiguous_chains(sorted(controlled))]
+    contested_possession_rate = contested_control / max(len(controlled), 1)
+
+    return {
+        "possession_frame_rate": possession_frame_rate,
+        "n_possession_chains": float(len(chain_lengths)),
+        "mean_chain_frames": float(pd.Series(chain_lengths).mean()) if chain_lengths else 0.0,
+        "max_chain_frames": float(max(chain_lengths)) if chain_lengths else 0.0,
+        "contested_possession_rate": contested_possession_rate,
+        "pressure_mean": float(pd.Series(pressure_counts).mean()) if pressure_counts else 0.0,
+        "pressure_high_rate": float((pd.Series(pressure_counts) >= PRESSURE_HIGH_COUNT).mean()) if pressure_counts else 0.0,
+        "pressure_max": float(max(pressure_counts)) if pressure_counts else 0.0,
+    }
 
 
 def build_match_track_features(
@@ -44,7 +139,7 @@ def build_match_track_features(
         "player_box_area_mean",
     ]
     if detections is None or len(detections) == 0:
-        return {k: 0.0 for k in keys}
+        return {k: 0.0 for k in keys + POSSESSION_KEYS}
 
     df = _center(detections)
     classes = df["class_name"].astype(str).str.lower()
@@ -93,7 +188,7 @@ def build_match_track_features(
 
     player_box_area_mean = float(players["area"].mean() / max(video_width * video_height, 1.0)) if len(players) else 0.0
 
-    return {
+    row = {
         "n_frames": n_frames,
         "ball_rate": ball_rate,
         "person_frame_rate": person_frame_rate,
@@ -105,6 +200,8 @@ def build_match_track_features(
         "ball_movement": ball_movement / max(len(ball_frames) - 1, 1),
         "player_box_area_mean": player_box_area_mean,
     }
+    row.update(build_possession_features(detections, video_width=video_width, video_height=video_height))
+    return row
 
 
 def build_track_dataset(
@@ -143,6 +240,8 @@ FEATURE_COLUMNS = [
     "ball_movement",
     "player_box_area_mean",
 ]
+
+POSSESSION_FEATURE_COLUMNS = list(POSSESSION_KEYS)
 
 
 def evaluate_match_predictor(

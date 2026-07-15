@@ -86,6 +86,7 @@ from soccer_edge.video.calibration_io import load_homography
 from soccer_edge.video.local_catalog import write_local_video_catalog
 from soccer_edge.video.state_tables import write_video_state_tables
 from soccer_edge.video.yolo_pipeline import run_yolo_detection
+from soccer_edge.video.track_features import build_possession_features
 
 app = typer.Typer(help="Soccer analytics research CLI.")
 ingest_app = typer.Typer(help="Ingest open soccer datasets.")
@@ -645,6 +646,26 @@ def build_player_aggregate(
     else:
         aggregates.to_csv(output, index=False)
     console.print(f"wrote={output} players={len(aggregates)}")
+
+
+@features_app.command("possession-track")
+def build_possession_track_features(
+    detections: Path = typer.Option(..., exists=True, help="Per-frame detection table (parquet/csv) with frame_idx, class_name, x1,y1,x2,y2."),
+    output: Path = typer.Option(Path("data/processed/possession_track_features.csv")),
+    video_width: float = typer.Option(1920.0),
+    video_height: float = typer.Option(1080.0),
+) -> None:
+    """Build tracking-derived possession chains and ball-proximity pressure features from detections."""
+
+    frame = pd.read_parquet(detections) if detections.suffix == ".parquet" else pd.read_csv(detections)
+    feats = build_possession_features(frame, video_width=video_width, video_height=video_height)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    feats_df = pd.DataFrame([feats])
+    if output.suffix == ".parquet":
+        feats_df.to_parquet(output, index=False)
+    else:
+        feats_df.to_csv(output, index=False)
+    console.print(f"wrote={output}")
 
 
 @features_app.command("tensor-samples")
