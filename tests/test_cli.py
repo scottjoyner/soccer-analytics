@@ -69,10 +69,29 @@ def test_video_plan_command(tmp_path) -> None:
 
 
 def test_video_process_command(tmp_path) -> None:
-    clip = tmp_path / "clip.mp4"
-    output = tmp_path / "video_out"
+    licensed_root = tmp_path / "licensed"
+    licensed_root.mkdir()
+    clip = licensed_root / "clip.mp4"
     clip.write_bytes(b"demo")
-    result = runner.invoke(app, ["video", "process", "--input", str(clip), "--output-dir", str(output), "--frame-count", "1"])
+    output = tmp_path / "video_out"
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "video_id,match_id,clip_type,local_path,rights_status,rights_reference\n"
+        f"good,match,full_match,{clip},licensed,license-file:///perms/wc2026.pdf\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "video", "process",
+            "--input", str(clip),
+            "--output-dir", str(output),
+            "--frame-count", "1",
+            "--manifest", str(manifest),
+            "--video-id", "good",
+            "--licensed-root", str(licensed_root),
+        ],
+    )
     assert result.exit_code == 0
     assert (output / "detections.parquet").exists()
 

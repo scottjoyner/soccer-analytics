@@ -54,9 +54,14 @@ def main() -> None:
         if not trans.exists():
             transcode(src, trans)
         outdir.mkdir(parents=True, exist_ok=True)
+        # These clips are a known, rights-approved local source (pre-approved by the
+        # operator, not scraped/remote). The CLI gate is bypassed deliberately here via
+        # enforce_rights=False; a production run should instead pass a manifest row so
+        # every clip is gated. The base run_yolo_detection now refuses un-gated footage.
         run_yolo_detection(
             input_path=trans, output_dir=outdir, model_path=MODEL,
             stride=STRIDE, max_samples=MAX_SAMPLES, confidence_threshold=CONF, transform=None,
+            enforce_rights=False,
         )
         done += 1
         print(f"[{done}/{total}] {mid} -> {det}", flush=True)

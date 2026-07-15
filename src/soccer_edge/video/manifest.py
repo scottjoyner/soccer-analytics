@@ -153,3 +153,9 @@ def validate_processable_video(
     local_path = row.local_path.resolve()
     if root not in local_path.parents and local_path != root:
         raise ValueError(f"Video {row.video_id} is outside licensed root: {local_path}")
+
+    if not local_path.exists():
+        raise ValueError(
+            f"Video {row.video_id} local_path does not exist: {local_path}; "
+            "cannot process a manifest row whose file is missing."
+        )

@@ -253,13 +253,18 @@ def _enforce_rights_gate(
     input_path: Path,
     licensed_root: Path,
 ) -> None:
-    """Defense-in-depth: if a manifest row is named, refuse to open the footage
-    unless it is an approved, rights-referenced row whose path matches input."""
+    """Defense-in-depth: refuse to open footage unless it is an approved,
+    rights-referenced manifest row whose path matches input. Passing no
+    --manifest/--video-id is not allowed for footage-processing commands: the
+    rights gate must be satisfied (or the caller must pass enforce_rights=False
+    to run_yolo_detection for synthetic/pre-approved frames)."""
 
-    if manifest is None and video_id is None:
-        return
     if manifest is None or video_id is None:
-        raise typer.BadParameter("--manifest and --video-id must be supplied together.")
+        raise typer.BadParameter(
+            "footage processing requires an approved manifest row: pass both --manifest "
+            "and --video-id. Synthetic/pre-approved frames that bypass the gate are not "
+            "accepted from the CLI."
+        )
     assert_processable(manifest, video_id, input_path, licensed_root)
 
 
@@ -375,6 +380,9 @@ def detect_yolo(
         max_samples=max_samples,
         confidence_threshold=confidence,
         transform=transform,
+        rights_manifest=manifest,
+        rights_video_id=video_id,
+        licensed_root=licensed_root,
     )
     console.print({name: str(path) for name, path in paths.items()})
 
