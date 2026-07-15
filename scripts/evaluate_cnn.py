@@ -1,0 +1,81 @@
+"""Out-of-sample evaluation of the highlight-clip CNN winner classifier.
+
+Loads the 98 processed highlight detections and labels, splits matches into a
+stratified train/test hold-out, trains the FieldStateCNN on train, and reports
+held-out sequence- and match-level accuracy plus a multiclass Brier score.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+from soccer_edge.evaluation.cnn_eval import evaluate_cnn_out_of_sample
+
+REPO = Path("/home/scott/git/soccer-analytics")
+DET_ROOT = REPO / "data/processed/highlights/detections"
+RESULTS = REPO / "data/processed/highlights/match_results.csv"
+OUT = REPO / "data/processed/highlights/training/cnn_eval"
+OUT.mkdir(parents=True, exist_ok=True)
+
+
+def _limit_threads() -> None:
+    """Cap PyTorch threads to avoid CPU/memory oversubscription crashes.
+
+    With 24 logical cores the default thread pools can multiply resident memory
+    (BLAS workspace per thread) and starve the box when large grids are resident.
+    """
+    try:
+        import torch  # noqa: WPS433 (late import, optional dependency)
+    except Exception:  # pragma: no cover - torch optional
+        return
+    n = int(os.environ.get("OMP_NUM_THREADS", min(8, os.cpu_count() or 1)))
+    torch.set_num_threads(n)
+    torch.set_num_interop_threads(max(1, n // 2))
+
+
+def load(max_matches: int | None = None):
+    results = pd.read_csv(RESULTS)
+    by_match: dict[str, pd.DataFrame] = {}
+    for p in sorted(DET_ROOT.glob("*/*detections.parquet")):
+        by_match[p.parent.name] = pd.read_parquet(p)
+        if max_matches is not None and len(by_match) >= max_matches:
+            break
+    return results, by_match
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--max-matches", type=int, default=None, help="cap number of matches loaded (safety)")
+    parser.add_argument("--epochs", type=int, default=5, help="CNN training epochs")
+    parser.add_argument("--batch-size", type=int, default=8, help="CNN batch size")
+    args = parser.parse_args()
+
+    _limit_threads()
+
+    results, by_match = load(args.max_matches)
+    if not by_match:
+        print("No highlight detections found", file=sys.stderr)
+        return 1
+    print(f"loaded {len(by_match)} matches")
+    metrics = evaluate_cnn_out_of_sample(
+        results, by_match, OUT, epochs=args.epochs, batch_size=args.batch_size
+    )
+    (OUT / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+    print("\n=== Highlight-clip CNN (out-of-sample, held-out matches) ===")
+    print(f"  train/test matches : {metrics['n_train_matches']} / {metrics['n_test_matches']}")
+    print(f"  train/test seqs    : {metrics['n_train_sequences']} / {metrics['n_test_sequences']}")
+    print(f"  sequence accuracy  : {metrics['sequence_accuracy']:.3f} (base {metrics['sequence_baseline_accuracy']:.3f})")
+    print(f"  match accuracy     : {metrics['match_accuracy']:.3f} (base {metrics['match_baseline_accuracy']:.3f})")
+    print(f"  winner Brier       : {metrics['winner_brier']:.3f}")
+    print(f"wrote {OUT / 'metrics.json'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

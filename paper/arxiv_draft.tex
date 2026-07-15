@@ -137,7 +137,10 @@ train/test split (68/30), a \texttt{StandardScaler}, and a
 calibrated and the Brier score is meaningful.
 \paragraph{Convolutional model.} \texttt{train\_match\_predictor\_cnn} builds an
 NPZ of occupancy-grid tensors (grouped by match, with a sliding window of
-sequence length 4) and trains a small CNN winner classifier (PyTorch).
+sequence length 4) and trains a small CNN winner classifier (PyTorch). The
+same grid tensors feed an out-of-sample evaluation (\texttt{scripts/evaluate\_cnn.py})
+that splits matches into a stratified 68/30 train/test hold-out and trains the
+CNN only on train, reporting held-out sequence- and match-level accuracy.
 
 \section{Case Study and Results}
 Over the 98 permitted clips the batch produced \textbf{88,127} detection rows
@@ -193,7 +196,12 @@ supervision---precisely the signal source the highlight-clip features lack.
 \paragraph{Honest limitation.} As Table~\ref{tab:results} shows, neither the
 count nor the track detection features outperform the majority-class baseline
 for winner prediction, and the calibrated Brier scores ($\approx0.61$) confirm
-the probabilities are no better than chance. This is the expected and, we argue,
+the probabilities are no better than chance. The out-of-sample CNN evaluation
+agrees: on the 30-match held-out split it reaches 51.6\% sequence accuracy and
+50.0\% match accuracy---both at the majority-class baseline---with a winner
+Brier of 0.617. The deep model therefore reproduces the same null result as the
+tabular features, rather than uncovering signal the counts miss. This is the
+expected and, we argue,
 informative result: short highlight reels are highlight-selected (not
 representative of open play), contain far fewer frames than a full match, and
 aggregate detection counts are nearly invariant to final score. The pipeline
