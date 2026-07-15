@@ -16,6 +16,7 @@ from pathlib import Path
 from soccer_edge.evaluation.match_eval import repeated_cv_match_predictor
 from soccer_edge.features.statsbomb_features import (
     build_match_event_features,
+    build_match_event_features_fold,
     default_event_features,
 )
 
@@ -64,8 +65,14 @@ def main() -> int:
     richer = default_event_features()
     print(f"matches: {len(frame)}  basic features: {len(BASIC_FEATURES)}  richer: {len(richer)}")
 
+    def _per_fold_xt(train_idx, test_idx, frm):
+        train_ids = frm.iloc[train_idx]["match_id"].astype(str).tolist()
+        return build_match_event_features_fold(source, train_ids)
+
     basic_metrics = repeated_cv_match_predictor(frame, BASIC_FEATURES, n_splits=5, n_repeats=10)
-    richer_metrics = repeated_cv_match_predictor(frame, richer, n_splits=5, n_repeats=10)
+    richer_metrics = repeated_cv_match_predictor(
+        frame, richer, n_splits=5, n_repeats=10, feature_refit_fn=_per_fold_xt
+    )
     metrics = {"basic": basic_metrics, "richer": richer_metrics}
     (OUT / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 

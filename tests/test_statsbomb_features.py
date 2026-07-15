@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import numpy as np
+
 
 from soccer_edge.features.statsbomb_features import (
     build_match_event_features,
@@ -91,3 +93,33 @@ def test_default_event_features_includes_xt_and_pressure(tmp_path: Path) -> None
     assert len(cols) == len(set(cols))
     assert "home_xg" in cols and "away_xg" in cols
     assert "home_xt" in cols and "away_pressure_regains" in cols
+
+
+def test_per_fold_xt_differs_from_league(tmp_path: Path) -> None:
+    from soccer_edge.features.statsbomb_features import (
+        build_match_event_features,
+        build_match_event_features_fold,
+    )
+
+    _fixture(tmp_path)
+    league = build_match_event_features(tmp_path)
+    fold = build_match_event_features_fold(tmp_path, train_match_ids=["1"])
+
+    # Match 2's xT uses a surface fit only on match 1, so it differs from the
+    # league-wide surface that also saw match 2.
+    lg2 = league[league["match_id"] == "2"].iloc[0]
+    fd2 = fold[fold["match_id"] == "2"].iloc[0]
+    assert lg2["home_xt"] != fd2["home_xt"]
+
+
+def test_per_fold_xt_full_matches_league(tmp_path: Path) -> None:
+    from soccer_edge.features.statsbomb_features import (
+        build_match_event_features,
+        build_match_event_features_fold,
+    )
+
+    _fixture(tmp_path)
+    league = build_match_event_features(tmp_path).set_index("match_id").sort_index()
+    fold = build_match_event_features_fold(tmp_path, train_match_ids=["1", "2"]).set_index("match_id").sort_index()
+    for col in ("home_xt", "away_xt"):
+        assert np.allclose(league[col].to_numpy(), fold[col].to_numpy())

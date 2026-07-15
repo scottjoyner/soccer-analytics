@@ -104,12 +104,18 @@ def _empty_counts() -> dict[str, int]:
     return {f"n_{t.lower().replace(' ', '_')}": 0 for t in EVENT_TYPES}
 
 
-def build_match_event_features(source_dir: Path, competition_ids: list[int] | None = None) -> pd.DataFrame:
+def build_match_event_features(
+    source_dir: Path,
+    competition_ids: list[int] | None = None,
+    xt_fit_matches: list[str] | None = None,
+) -> pd.DataFrame:
     """Return one row per match with home/away event features and labels.
 
     Includes count features, expected goals, expected threat (xT), and pressure
-    regains. The xT surface is fit from the event data itself (league-wide), in
-    the same spirit as the StatsBomb-provided xG already used.
+    regains. The xT surface is fit from the event data itself. By default it is
+    fit league-wide; pass ``xt_fit_matches`` to fit it only on a subset of match
+    ids (e.g. a cross-validation training fold) so test matches are scored with a
+    surface that never saw them.
     """
     source_dir = Path(source_dir)
     metadata = _load_match_metadata(source_dir)
@@ -119,6 +125,7 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
     shot_totals = np.zeros(N_CELLS, dtype=float)
     match_transitions: dict[str, dict[str, list[tuple[int, int]]]] = {}
     match_pressure_regains: dict[str, dict[str, int]] = {}
+    match_shot_cells: dict[str, dict[int, list[int]]] = {}
     rows_meta: list[dict[str, object]] = []
 
     for path in sorted(source_dir.glob("events/*.json")):
@@ -161,6 +168,7 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
         home_on_target = away_on_target = 0
         transitions: dict[str, list[tuple[int, int]]] = {home_name: [], away_name: []}
         pressure_regains = {home_name: 0, away_name: 0}
+        match_shot_cells[match_id] = {}
         last_pressure_idx: dict[str, int] = {home_name: -1, away_name: -1}
         counted_pressures: set[tuple[str, int]] = set()
 
@@ -183,6 +191,10 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
                 sx = sy = None
 
             if type_name == "Shot":
+                is_goal = (
+                    _shot_on_target(event)
+                    and (event.get("shot") or {}).get("outcome", {}).get("name") == "Goal"
+                )
                 if team_name == home_name:
                     home_xg += _shot_xg(event)
                     home_on_target += int(_shot_on_target(event))
@@ -193,8 +205,11 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
                     cell = loc_to_cell(*(mirror_location(sx, sy) if mirror_team[team_name] else (sx, sy)))
                     if cell >= 0:
                         shot_totals[cell] += 1
-                        if _shot_on_target(event) and (event.get("shot") or {}).get("outcome", {}).get("name") == "Goal":
+                        if is_goal:
                             shot_goals[cell] += 1
+                        bucket = match_shot_cells[match_id].setdefault(cell, [0, 0])
+                        bucket[0] += int(is_goal)
+                        bucket[1] += 1
 
             if type_name in XPTRANSITION_TYPES and sx is not None:
                 start = loc_to_cell(*(mirror_location(sx, sy) if mirror_team[team_name] else (sx, sy)))
@@ -235,7 +250,9 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
             }
         )
 
-    xt = solve_xt(trans_counts, shot_goals, shot_totals)
+    xt = solve_xt(trans_counts, shot_goals, shot_totals) if xt_fit_matches is None else fit_xt_surface(
+        match_transitions, match_shot_cells, xt_fit_matches
+    )
 
     rows: list[dict[str, object]] = []
     for r in rows_meta:
@@ -269,6 +286,44 @@ def build_match_event_features(source_dir: Path, competition_ids: list[int] | No
         rows.append(row)
 
     return pd.DataFrame(rows)
+
+
+def fit_xt_surface(
+    match_transitions: dict[str, dict[str, list[tuple[int, int]]]],
+    match_shot_cells: dict[str, dict[int, list[int]]],
+    match_ids: list[str] | None = None,
+) -> np.ndarray:
+    """Fit an xT surface from a subset of matches' transitions and shot cells.
+
+    Pass ``match_ids`` to fit only on a cross-validation training fold so the
+    surface never sees the test matches it is later applied to.
+    """
+    trans_counts = np.zeros((N_CELLS, N_CELLS), dtype=float)
+    shot_goals = np.zeros(N_CELLS, dtype=float)
+    shot_totals = np.zeros(N_CELLS, dtype=float)
+    ids = match_ids if match_ids is not None else list(match_transitions.keys())
+    for mid in ids:
+        for team in match_transitions.get(mid, {}).values():
+            for start, end in team:
+                if 0 <= start < N_CELLS and 0 <= end < N_CELLS:
+                    trans_counts[start, end] += 1
+        for cell, (goals, totals) in match_shot_cells.get(mid, {}).items():
+            shot_goals[cell] += goals
+            shot_totals[cell] += totals
+    return solve_xt(trans_counts, shot_goals, shot_totals)
+
+
+def build_match_event_features_fold(
+    source_dir: Path,
+    train_match_ids: list[str],
+    competition_ids: list[int] | None = None,
+) -> pd.DataFrame:
+    """Build match features with the xT surface fit only on ``train_match_ids``.
+
+    Every returned row (including held-out test matches) uses this training-fold
+    surface, eliminating the negligible league-wide xT leakage.
+    """
+    return build_match_event_features(source_dir, competition_ids=competition_ids, xt_fit_matches=train_match_ids)
 
 
 def default_event_features() -> list[str]:

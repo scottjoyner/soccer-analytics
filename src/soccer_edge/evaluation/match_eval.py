@@ -6,6 +6,8 @@ defensible rather than an artifact of one lucky split.
 """
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
@@ -23,6 +25,7 @@ def repeated_cv_match_predictor(
     n_splits: int = 5,
     n_repeats: int = 10,
     random_state: int = 0,
+    feature_refit_fn: Callable | None = None,
 ) -> dict:
     """Repeated stratified CV of a calibrated winner classifier + score regressors.
 
@@ -31,15 +34,19 @@ def repeated_cv_match_predictor(
     """
     x = frame[feature_columns].to_numpy(dtype=float)
     y = frame["winner"].to_numpy(dtype=int)
-    home = frame["home_score"].to_numpy(dtype=float)
-    away = frame["away_score"].to_numpy(dtype=float)
 
     cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
     acc, brier, home_mse, away_mse, base_acc = [], [], [], [], []
 
     for train_idx, test_idx in cv.split(x, y):
-        x_train, x_test = x[train_idx], x[test_idx]
-        y_train, y_test = y[train_idx], y[test_idx]
+        fold_frame = feature_refit_fn(train_idx, test_idx, frame) if feature_refit_fn is not None else frame
+        fx = fold_frame[feature_columns].to_numpy(dtype=float)
+        fy = fold_frame["winner"].to_numpy(dtype=int)
+        fhome = fold_frame["home_score"].to_numpy(dtype=float)
+        faway = fold_frame["away_score"].to_numpy(dtype=float)
+
+        x_train, x_test = fx[train_idx], fx[test_idx]
+        y_train, y_test = fy[train_idx], fy[test_idx]
 
         pipe = Pipeline(
             [
@@ -65,7 +72,7 @@ def repeated_cv_match_predictor(
         majority = pd.Series(y_train).mode().iloc[0]
         base_acc.append(float((np.full(len(y_test), majority) == y_test).mean()))
 
-        for target, store in ((home, home_mse), (away, away_mse)):
+        for target, store in ((fhome, home_mse), (faway, away_mse)):
             reg = RandomForestRegressor(n_estimators=100, random_state=random_state, n_jobs=1)
             reg.fit(x_train, target[train_idx])
             pred = reg.predict(x_test)
