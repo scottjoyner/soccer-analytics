@@ -25,6 +25,10 @@ data/predictions/**
 # Ultralytics default training output (train object-model)
 runs/
 
+# Local working video manifest (points at local/gitignored footage).
+# The tracked canonical is manifests/video_manifest.example.csv.
+manifests/video_manifest.csv
+
 # Media
 *.mp4
 *.mov
