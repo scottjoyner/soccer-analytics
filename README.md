@@ -24,7 +24,14 @@ boundary.
 4. **Fine-tunes match-outcome models** — a tabular winner classifier + home/away
    score regressors, and a convolutional occupancy-grid winner model
    (`train match-predictor`, `train match-predictor-cnn`).
-5. **Enforces rights by construction** — any approved footage row must carry a
+5. **Captures permitted local footage for intake** — records screen, webcam, or a
+   screenshot (`capture screen|webcam|image`), optionally running live YOLO
+   detection while recording (`--detect`), and registers each capture as a
+   rights-gated manifest row ready for the pipeline.
+6. **Gates model promotion on measured lift** — the promotion gate refuses to
+   promote a model bundle unless it beats the majority-class baseline and clears a
+   Brier threshold, closing the loop from evaluation to a promoted artifact.
+7. **Enforces rights by construction** — any approved footage row must carry a
    recorded `rights_reference`, and the footage file is opened only when its
    path matches the approved manifest entry.
 
@@ -40,10 +47,15 @@ This repository treats data-rights as a system property, not documentation:
   non-empty `rights_reference`** (an explicit written-rights pointer).
 - A single assertion, `assert_processable`, is reused across the command
   surface: `discover video`, `catalog-local`, `video plan`, `detect-yolo`,
-  `process`, `process-local-model`, `export-frames`, `train player-ball`, and
-  `train local-finetune`. When a manifest row is named, footage is processed
-  only if its `rights_reference` is recorded **and** its `local_path` matches the
-  input.
+  `process`, `process-local-model`, `export-frames`, `train player-ball`,
+  `train local-finetune`, and the `capture` commands. When a manifest row is
+  named, footage is processed only if its `rights_reference` is recorded **and**
+  its `local_path` matches the input.
+- A **modality blocklist** (`configs/modality_rules.json`) rejects any manifest
+  row whose `source_url`/`clip_type` references a blocked modality (`youtube`,
+  `youtu.be`, `twitch`, `stream`, or an `http(s)/rtmp/rtsp` scheme), so remote
+  URLs can never become processing inputs. Local captures use a `capture://`
+  scheme that stays within the gate.
 - Public video URLs are stored as discovery metadata only; they are never
   processing inputs.
 
@@ -123,6 +135,34 @@ soccer-edge video detect-yolo --input /path/to/licensed/clip.mp4 --model-path yo
   --output-dir data/processed/video_yolo --manifest manifests/local_video_manifest.csv --video-id clip
 ```
 
+### Capture intake (screen / webcam / image)
+
+Record permitted local footage straight into the pipeline. Every capture requires
+an approved `--rights-status` (`owned`/`licensed`/`compatible_license`) and a
+recorded `--rights-reference`; the command refuses otherwise. This is for content
+you own or are licensed for — capturing third-party streams (YouTube, Twitch, …)
+is prohibited by the rights gate.
+
+```bash
+# save footage + append a rights-gated manifest row
+soccer-edge capture screen --duration 30 --fps 20 \
+  --rights-status owned --rights-reference "personal-recording://self"
+soccer-edge capture webcam --duration 30 --device 0 \
+  --rights-status owned --rights-reference "personal-recording://self"
+
+# real-time mode: run YOLO detection on each frame as it is recorded,
+# writing a detections table (and an annotated video with --annotate)
+soccer-edge capture screen --detect --object-model-path models/yolov8n.pt --annotate \
+  --duration 30 --rights-status owned --rights-reference "personal-recording://self"
+```
+
+Captures land in `data/raw/video_licensed/captures/`. The command prints the next
+step — feeding the saved file into `train local-finetune` (or, for `--detect`, the
+detections CSV into `video prepare-object-dataset`).
+
+Requires the optional `mss` package for screen capture (`pip install mss`, included
+in `requirements-ml.txt`).
+
 ### Match-outcome models
 
 ```bash
@@ -131,6 +171,30 @@ soccer-edge train match-predictor --detections det1.parquet det2.parquet \
 soccer-edge train match-predictor-cnn --detections det1.parquet det2.parquet \
   --results match_results.csv --output-dir data/processed/match_predictor_cnn
 ```
+
+### Evaluation → promotion gate
+
+Model promotion is gated on measured, out-of-sample lift. Convert an eval
+`metrics.json` into a predictive-metrics table, run the gate, and promote only if
+it passes:
+
+```bash
+soccer-edge model eval-to-metrics --metrics-json <OUT>/metrics.json \
+  --output data/processed/predictive_metrics.csv --model-name cnn-v1
+soccer-edge model promotion-gate \
+  --model-card-path MODEL_CARD.md --data-card-path DATA_CARD.md \
+  --dataset-versions versions.csv --audit-dir audit --object-metrics obj_metrics.csv \
+  --predictive-metrics data/processed/predictive_metrics.csv \
+  --majority-baseline-rate 0.50 --min-accuracy-lift 0.02 --max-brier 0.50
+soccer-edge model promote --bundle-dir <candidate> --promoted-root models/promoted \
+  --predictive-metrics data/processed/predictive_metrics.csv \
+  --majority-baseline-rate 0.50 --min-accuracy-lift 0.02 --max-brier 0.50 \
+  --dataset-versions versions.csv --audit-dir audit --object-metrics obj_metrics.csv
+```
+
+`model promote` exits non-zero and writes nothing when the gate fails, so the
+highlight-clip models (which show no lift) cannot be promoted until a rights-clean
+source yields genuine lift.
 
 ---
 

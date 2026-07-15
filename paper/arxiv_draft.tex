@@ -51,8 +51,11 @@ This paper describes \textsc{Soccer-Edge}, a pipeline organized around three
 invariants: (i) public video URLs are \emph{discovery metadata only} and are
 never processing inputs; (ii) every processed table and derived feature table
 carries lineage fields and an explicit \texttt{rights\_reference}; and (iii) a
-single rights gate is enforced at every footage entry point. We validate the
-system end-to-end on 98 permitted local highlight clips and open event data.
+single rights gate is enforced at every footage entry point---including a
+local screen/webcam/image \emph{capture} intake that is itself rights-gated. We
+validate the system end-to-end on 98 permitted local highlight clips and open
+event data, and we describe an evaluation-to-promotion gate that refuses to
+promote a model unless it demonstrates measured out-of-sample lift.
 
 \section{Related Work}
 Event-stream datasets such as StatsBomb Open Data~\cite{statsbomb}, Metrica
@@ -79,7 +82,8 @@ A single assertion, \texttt{assert\_processable}, is reused across the
 command surface: \texttt{discover video} (metadata only), \texttt{catalog-local},
 \texttt{video plan}, \texttt{detect-yolo}, \texttt{process},
 \texttt{process-local-model}, \texttt{export-frames},
-\texttt{train player-ball}, and \texttt{train local-finetune}. When a
+\texttt{train player-ball}, \texttt{train local-finetune}, and the
+\texttt{capture} intake commands. When a
 manifest row is named, the footage file is opened only if its
 \texttt{rights\_reference} is recorded \emph{and} its \texttt{local\_path}
 matches the input. This makes the rights check a hard, test-covered gate rather
@@ -94,7 +98,22 @@ We further harden the gate with a \emph{modality blocklist}
 public or remote URLs stay discovery metadata only and can never become
 processing inputs, even if a manifest row is otherwise well formed.
 
+\paragraph{Rights-gated capture intake.} To let a researcher process footage
+they are entitled to, the pipeline provides a local \emph{capture} intake
+(\texttt{capture screen\,|\,webcam\,|\,image}) that records the screen, a
+webcam, or a single screenshot to a licensed captures directory and appends a
+rights-gated manifest row. Every capture requires an approved
+\texttt{rights\_status} and a recorded \texttt{rights\_reference}, and the
+captured source is written with a local \texttt{capture://} scheme so the same
+modality blocklist applies---capturing a third-party stream remains prohibited.
+A real-time mode (\texttt{--detect}) runs the YOLO detector on each frame as it
+is recorded, emitting a per-frame detections table (and, optionally, an
+annotated video) so footage is processed \emph{as} it is captured rather than
+only after saving; the resulting file and detections feed the same
+rights-gated fine-tuning path.
+
 \section{Data}
+\label{sec:data}
 \paragraph{Open event data.} StatsBomb Open Data, Metrica sample events/tracking,
 approved SoccerNet subsets, OpenFootball match-result archives, and
 football-data.co.uk historical results are ingested into normalized Parquet
@@ -157,6 +176,20 @@ sequence length 4) and trains a small CNN winner classifier (PyTorch). The
 same grid tensors feed an out-of-sample evaluation (\texttt{scripts/evaluate\_cnn.py})
 that splits matches into a stratified 68/30 train/test hold-out and trains the
 CNN only on train, reporting held-out sequence- and match-level accuracy.
+
+\paragraph{Evaluation-to-promotion gate.} Model promotion is treated as a
+governed, test-covered decision rather than a manual step. An
+\texttt{eval-to-metrics} bridge normalizes each evaluation script's
+\texttt{metrics.json} into a flat predictive-metrics table (accuracy, Brier), and
+a promotion gate (\texttt{model promotion-gate}) checks card validity, dataset
+versioning, annotation audits, and object metrics \emph{and} enforces two
+predictive criteria: the candidate must beat the majority-class baseline by a
+configurable accuracy margin and stay under a maximum Brier threshold. Only a
+passing bundle can be promoted (\texttt{model promote}) into a versioned
+promoted-model directory with its cards, metrics, and gate report; a failing
+bundle exits non-zero and writes nothing. Consequently the highlight-clip models
+below, which show no out-of-sample lift, are structurally blocked from promotion
+until a rights-clean source supplies genuine lift.
 
 \section{Case Study and Results}
 Over the 98 permitted clips the batch produced \textbf{88,127} detection rows
@@ -258,12 +291,16 @@ real-money actions are performed.
 \section{Conclusion and Future Work}
 We presented a rights-safe, local-first soccer analytics pipeline that turns
 permitted footage and open event data into detection datasets and match-outcome
-models, with a hard, tested rights gate at every footage boundary. Future work
-includes calibrating the detector on full-match footage. Per-fold xT surface
-fitting (eliminating even the negligible league-wide leakage), tracking-derived
-possession features, the feature scaler, calibrated classifier, repeated
-cross-validated evaluation, per-90/lineup-aware player features, the
-modality-blocklist rights gate, an open event-data model with expected threat,
+models, with a hard, tested rights gate at every footage boundary---extended to
+a rights-gated screen/webcam/image capture intake with an optional real-time
+detection mode. An evaluation-to-promotion gate closes the loop by admitting only
+models with measured out-of-sample lift into a versioned promoted-model store.
+Future work includes calibrating the detector on full-match footage. Per-fold xT
+surface fitting (eliminating even the negligible league-wide leakage),
+tracking-derived possession features, the feature scaler, calibrated classifier,
+repeated cross-validated evaluation, per-90/lineup-aware player features, the
+modality-blocklist rights gate, rights-gated capture intake, the
+evaluation-to-promotion gate, an open event-data model with expected threat,
 and player-match/player-form graph payloads are already in place.
 
 \bibliographystyle{plain}
