@@ -48,6 +48,32 @@ def test_beats_majority_baseline(tmp_path) -> None:
     assert ok_skip
 
 
+def test_beats_majority_baseline_uses_recorded_baseline(tmp_path) -> None:
+    """When no rate is passed, the gate must use the recorded baseline_accuracy."""
+    from soccer_edge.promotion_gate import beats_majority_baseline
+
+    metrics = tmp_path / "pred.csv"
+    # No-lift model: accuracy equals the recorded baseline. Must FAIL with default lift.
+    pd.DataFrame([{"accuracy": 0.50, "brier": 0.30, "baseline_accuracy": 0.50}]).to_csv(metrics, index=False)
+    ok, notes = beats_majority_baseline(metrics, min_accuracy_lift=0.02)
+    assert not ok, notes
+    # Real lift over the recorded baseline passes.
+    good = tmp_path / "good.csv"
+    pd.DataFrame([{"accuracy": 0.60, "brier": 0.30, "baseline_accuracy": 0.50}]).to_csv(good, index=False)
+    ok_good, _ = beats_majority_baseline(good, min_accuracy_lift=0.02)
+    assert ok_good
+
+
+def test_beats_majority_baseline_fallback_note(tmp_path) -> None:
+    from soccer_edge.promotion_gate import beats_majority_baseline
+
+    metrics = tmp_path / "pred.csv"
+    pd.DataFrame([{"accuracy": 0.10, "brier": 0.30}]).to_csv(metrics, index=False)
+    ok, notes = beats_majority_baseline(metrics, min_accuracy_lift=0.02)
+    assert ok  # 0.10 >= 0.0 + 0.02
+    assert any("using 0.0" in note for note in notes)
+
+
 def test_brier_within_threshold(tmp_path) -> None:
     from soccer_edge.promotion_gate import brier_within_threshold
 

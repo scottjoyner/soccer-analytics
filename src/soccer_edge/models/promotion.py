@@ -26,7 +26,7 @@ class PromotionRecord:
     gate_ok: bool
     accuracy: float | None = None
     brier: float | None = None
-    majority_baseline_rate: float = 0.0
+    majority_baseline_rate: float | None = None
     min_accuracy_lift: float = 0.0
     max_brier: float | None = None
 
@@ -49,7 +49,7 @@ def promote_bundle(
     audit_dir: Path,
     object_metrics_path: Path,
     predictive_metrics_path: Path | None = None,
-    majority_baseline_rate: float = 0.0,
+    majority_baseline_rate: float | None = None,
     min_accuracy_lift: float = 0.0,
     max_brier: float | None = None,
     min_f1: float = 0.0,

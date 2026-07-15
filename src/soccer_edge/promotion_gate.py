@@ -41,9 +41,27 @@ def read_metrics_table(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
 
 
+def resolve_baseline_rate(frame: pd.DataFrame, majority_baseline_rate: float | None) -> tuple[float, str | None]:
+    """Resolve the baseline accuracy to compare against.
+
+    When ``majority_baseline_rate`` is explicitly given it wins. Otherwise the
+    recorded ``baseline_accuracy`` column (written by the eval-to-metrics bridge)
+    is used, so the gate cannot be trivially passed by forgetting to supply a
+    baseline. Falls back to 0.0 only if neither is available.
+    """
+
+    if majority_baseline_rate is not None:
+        return float(majority_baseline_rate), None
+    if "baseline_accuracy" in frame.columns:
+        valid = frame["baseline_accuracy"].dropna()
+        if not valid.empty:
+            return float(valid.mean()), None
+    return 0.0, "no majority-baseline-rate given and no baseline_accuracy column; using 0.0"
+
+
 def beats_majority_baseline(
     path: Path | None,
-    majority_baseline_rate: float = 0.0,
+    majority_baseline_rate: float | None = None,
     min_accuracy_lift: float = 0.0,
 ) -> tuple[bool, list[str]]:
     if path is None or not nonempty_file(path):
@@ -52,16 +70,16 @@ def beats_majority_baseline(
     if "accuracy" not in frame.columns:
         return True, ["no accuracy column; skipping baseline check"]
     accuracy = float(frame["accuracy"].fillna(0.0).mean())
-    required = majority_baseline_rate + min_accuracy_lift
+    baseline_rate, note = resolve_baseline_rate(frame, majority_baseline_rate)
+    notes = [note] if note else []
+    required = baseline_rate + min_accuracy_lift
     if accuracy < required:
-        return (
-            False,
-            [
-                f"accuracy {accuracy:.4f} below required {required:.4f} "
-                f"(majority {majority_baseline_rate:.4f} + lift {min_accuracy_lift:.4f})"
-            ],
+        notes.append(
+            f"accuracy {accuracy:.4f} below required {required:.4f} "
+            f"(majority {baseline_rate:.4f} + lift {min_accuracy_lift:.4f})"
         )
-    return True, []
+        return False, notes
+    return True, notes
 
 
 def brier_within_threshold(path: Path | None, max_brier: float | None = None) -> tuple[bool, list[str]]:
@@ -84,7 +102,7 @@ def run_promotion_gate(
     object_metrics_path: Path,
     min_f1: float = 0.0,
     predictive_metrics_path: Path | None = None,
-    majority_baseline_rate: float = 0.0,
+    majority_baseline_rate: float | None = None,
     min_accuracy_lift: float = 0.0,
     max_brier: float | None = None,
 ) -> PromotionGateResult:
@@ -122,7 +140,7 @@ def write_promotion_gate_report(
     object_metrics_path: Path,
     min_f1: float = 0.0,
     predictive_metrics_path: Path | None = None,
-    majority_baseline_rate: float = 0.0,
+    majority_baseline_rate: float | None = None,
     min_accuracy_lift: float = 0.0,
     max_brier: float | None = None,
 ) -> Path:

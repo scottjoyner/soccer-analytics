@@ -268,3 +268,84 @@ def test_capture_cli_detect(tmp_path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert (tmp_path / "det.csv").exists()
     assert len(read_video_manifest(manifest)) == 1
+
+
+class _EmptyCap(_FakeCap):
+    def __init__(self, device: int) -> None:
+        super().__init__(device)
+        self._frames = 0
+
+
+def test_capture_webcam_zero_frames_raises(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _EmptyCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    with pytest.raises(RuntimeError, match="no frames"):
+        capture_webcam_video(tmp_path / "cap.mp4", duration_seconds=0.5, fps=10)
+
+
+def test_capture_and_register_zero_frames_no_manifest(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _EmptyCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    manifest = tmp_path / "manifests" / "video_manifest.csv"
+    with pytest.raises(RuntimeError, match="no frames"):
+        capture_and_register(
+            "webcam",
+            tmp_path / "cap.mp4",
+            duration_seconds=0.5,
+            fps=10,
+            manifest_path=manifest,
+            rights_status="owned",
+            rights_reference="ref1",
+        )
+    assert not manifest.exists()
+
+
+def test_capture_and_detect_zero_frames_no_video(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _EmptyCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    det = tmp_path / "det.csv"
+    result = capture_and_detect(
+        "webcam",
+        runner=_FakeRunner(),
+        duration_seconds=0.2,
+        fps=10,
+        output_video=tmp_path / "cap.mp4",
+        detections_output=det,
+    )
+    assert result["video"] is None
+    assert det.exists()
+
+
+def test_capture_and_detect_and_register_zero_frames_no_manifest(tmp_path, monkeypatch) -> None:
+    from soccer_edge.capture import capture_and_detect_and_register
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _EmptyCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    manifest = tmp_path / "manifests" / "video_manifest.csv"
+    with pytest.raises(RuntimeError, match="no frames"):
+        capture_and_detect_and_register(
+            "webcam",
+            tmp_path / "cap.mp4",
+            runner=_FakeRunner(),
+            duration_seconds=0.2,
+            fps=10,
+            detections_output=tmp_path / "det.csv",
+            manifest_path=manifest,
+            rights_status="owned",
+            rights_reference="ref1",
+        )
+    assert not manifest.exists()
+
+
+def test_capture_and_detect_and_register_rejects_image(tmp_path) -> None:
+    from soccer_edge.capture import capture_and_detect_and_register
+
+    with pytest.raises(ValueError, match="live detection requires a video source"):
+        capture_and_detect_and_register(
+            "image",
+            tmp_path / "cap.mp4",
+            runner=_FakeRunner(),
+            detections_output=tmp_path / "det.csv",
+            rights_status="owned",
+            rights_reference="ref1",
+        )

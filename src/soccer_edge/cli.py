@@ -1226,7 +1226,7 @@ def promotion_gate(
     output: Path = typer.Option(Path("data/processed/promotion_gate.md")),
     min_f1: float = typer.Option(0.0),
     predictive_metrics: Path | None = typer.Option(None, exists=False),
-    majority_baseline_rate: float = typer.Option(0.0),
+    majority_baseline_rate: float | None = typer.Option(None),
     min_accuracy_lift: float = typer.Option(0.02),
     max_brier: float | None = typer.Option(None),
 ) -> None:
@@ -1270,7 +1270,7 @@ def promote(
     audit_dir: Path = typer.Option(..., exists=True),
     object_metrics: Path = typer.Option(..., exists=True),
     predictive_metrics: Path | None = typer.Option(None, exists=False),
-    majority_baseline_rate: float = typer.Option(0.0),
+    majority_baseline_rate: float | None = typer.Option(None),
     min_accuracy_lift: float = typer.Option(0.02),
     max_brier: float | None = typer.Option(None),
     min_f1: float = typer.Option(0.0),

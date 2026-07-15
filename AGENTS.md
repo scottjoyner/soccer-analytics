@@ -204,9 +204,13 @@ Forward-looking:
 
    The `model promotion-gate` command now enforces this automatically: pass
    `--predictive-metrics` (a table with `accuracy`/`brier` columns),
-   `--majority-baseline-rate`, `--min-accuracy-lift` (default 0.02), and
-   `--max-brier`. The `beats_majority_baseline` and `brier_within_threshold`
-   checks fail the gate when a bundle shows no lift or is uncalibrated.
+   `--min-accuracy-lift` (default 0.02), and `--max-brier`. When
+   `--majority-baseline-rate` is omitted the gate uses the `baseline_accuracy`
+   column recorded in the predictive-metrics table (written by
+   `eval-to-metrics`), so a no-lift model cannot slip through by forgetting the
+   flag; only if neither is available does it fall back to 0.0 (with a note).
+   The `beats_majority_baseline` and `brier_within_threshold` checks fail the
+   gate when a bundle shows no lift or is uncalibrated.
 
    The eval scripts emit a `metrics.json` whose schema differs per script. Normalize
    it into the promotion-gate predictive metrics table with:

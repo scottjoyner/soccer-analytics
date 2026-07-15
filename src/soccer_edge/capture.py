@@ -24,6 +24,7 @@ from soccer_edge.video.manifest import PROCESSABLE_RIGHTS_STATUSES, VideoManifes
 
 CAPTURE_SCHEME = "capture"
 DEFAULT_CAPTURE_DIR = Path("data/raw/video_licensed/captures")
+DEFAULT_DURATION_SECONDS = 10.0
 
 
 def _load_mss():
@@ -73,7 +74,7 @@ def parse_region(region: str | None) -> dict | None:
 
 def capture_webcam_video(
     output: Path,
-    duration_seconds: float = 10.0,
+    duration_seconds: float = DEFAULT_DURATION_SECONDS,
     fps: int = 20,
     device: int = 0,
     codec: str = "mp4v",
@@ -81,12 +82,18 @@ def capture_webcam_video(
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     writer = None
-    for frame, _ in _iter_frames("webcam", duration_seconds=duration_seconds, fps=fps, device=device):
-        if writer is None:
-            writer = _open_video_writer(output, fps, frame, codec)
-        writer.write(frame)
-    if writer is not None:
-        writer.release()
+    frames_written = 0
+    try:
+        for frame, _ in _iter_frames("webcam", duration_seconds=duration_seconds, fps=fps, device=device):
+            if writer is None:
+                writer = _open_video_writer(output, fps, frame, codec)
+            writer.write(frame)
+            frames_written += 1
+    finally:
+        if writer is not None:
+            writer.release()
+    if frames_written == 0:
+        raise RuntimeError(f"webcam capture produced no frames (device {device}); nothing written")
     return output
 
 
@@ -102,14 +109,20 @@ def capture_screen_video(
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     writer = None
-    for frame, _ in _iter_frames(
-        "screen", duration_seconds=duration_seconds, fps=fps, monitor=monitor, region=region, mss_module=mss_module
-    ):
-        if writer is None:
-            writer = _open_video_writer(output, fps, frame, codec)
-        writer.write(frame)
-    if writer is not None:
-        writer.release()
+    frames_written = 0
+    try:
+        for frame, _ in _iter_frames(
+            "screen", duration_seconds=duration_seconds, fps=fps, monitor=monitor, region=region, mss_module=mss_module
+        ):
+            if writer is None:
+                writer = _open_video_writer(output, fps, frame, codec)
+            writer.write(frame)
+            frames_written += 1
+    finally:
+        if writer is not None:
+            writer.release()
+    if frames_written == 0:
+        raise RuntimeError("screen capture produced no frames; nothing written")
     return output
 
 
@@ -229,39 +242,44 @@ def capture_and_detect(
     detections: list[dict] = []
     writer = None
     frame_idx = 0
-    for frame, elapsed in _iter_frames(
-        capture_source,
-        duration_seconds=duration_seconds if duration_seconds is not None else 10.0,
-        fps=fps,
-        monitor=monitor,
-        region=region,
-        device=device,
-        mss_module=mss_module,
-    ):
-        rows = runner(frame)
-        for row in rows:
-            detections.append(
-                {
-                    "frame_idx": frame_idx,
-                    "timestamp_seconds": round(elapsed, 3),
-                    "class_name": row["class_name"],
-                    "confidence": float(row["confidence"]),
-                    "x1": float(row["x1"]),
-                    "y1": float(row["y1"]),
-                    "x2": float(row["x2"]),
-                    "y2": float(row["y2"]),
-                }
-            )
-        display = _draw_boxes(frame, rows) if annotate else frame
-        if output_video is not None:
-            if writer is None:
-                writer = _open_video_writer(output_video, fps, display, codec)
-            writer.write(display)
-        frame_idx += 1
-    if writer is not None:
-        writer.release()
+    frames_written = 0
+    try:
+        for frame, elapsed in _iter_frames(
+            capture_source,
+            duration_seconds=duration_seconds if duration_seconds is not None else DEFAULT_DURATION_SECONDS,
+            fps=fps,
+            monitor=monitor,
+            region=region,
+            device=device,
+            mss_module=mss_module,
+        ):
+            rows = runner(frame)
+            for row in rows:
+                detections.append(
+                    {
+                        "frame_idx": frame_idx,
+                        "timestamp_seconds": round(elapsed, 3),
+                        "class_name": row["class_name"],
+                        "confidence": float(row["confidence"]),
+                        "x1": float(row["x1"]),
+                        "y1": float(row["y1"]),
+                        "x2": float(row["x2"]),
+                        "y2": float(row["y2"]),
+                    }
+                )
+            display = _draw_boxes(frame, rows) if annotate else frame
+            if output_video is not None:
+                if writer is None:
+                    writer = _open_video_writer(output_video, fps, display, codec)
+                writer.write(display)
+                frames_written += 1
+            frame_idx += 1
+    finally:
+        if writer is not None:
+            writer.release()
     detections_path = _write_detections_csv(detections, detections_output)
-    return {"video": Path(output_video) if output_video is not None else None, "detections": detections_path}
+    saved_video = Path(output_video) if (output_video is not None and frames_written > 0) else None
+    return {"video": saved_video, "detections": detections_path}
 
 
 def capture_and_detect_and_register(
@@ -313,6 +331,11 @@ def capture_and_detect_and_register(
     )
     saved_video = result["video"]
     detections_path = result["detections"]
+    if saved_video is None:
+        raise RuntimeError(
+            "capture produced no frames; no video written and manifest not updated "
+            f"(detections table at {detections_path})"
+        )
     resolved_video_id = video_id or f"capture-{_utc_stamp()}"
     row = build_capture_row(
         video_id=resolved_video_id,
@@ -400,7 +423,12 @@ def capture_and_register(
     mss_module=None,
 ) -> tuple[Path, VideoManifestRow]:
     if capture_source == "webcam":
-        saved = capture_webcam_video(output, duration_seconds=duration_seconds or 10.0, fps=fps, device=device)
+        saved = capture_webcam_video(
+            output,
+            duration_seconds=duration_seconds if duration_seconds is not None else DEFAULT_DURATION_SECONDS,
+            fps=fps,
+            device=device,
+        )
     elif capture_source == "screen":
         if duration_seconds is None:
             raise ValueError("duration_seconds is required for screen video capture")

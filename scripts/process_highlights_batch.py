@@ -7,10 +7,10 @@ tables are written to data/processed/highlights/detections/<match_id>/detections
 Resumable: files already processed (detections.parquet present) are skipped.
 """
 from __future__ import annotations
-import subprocess, sys, re
+import re
+import subprocess
 from pathlib import Path
 
-import pandas as pd
 from soccer_edge.video.yolo_pipeline import run_yolo_detection
 
 SRC = Path("/media/scott/SSD_4TB/fileserver/highlights")
