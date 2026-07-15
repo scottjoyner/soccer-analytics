@@ -173,6 +173,28 @@ detections CSV into `video prepare-object-dataset`).
 Requires the optional `mss` package for screen capture (`pip install mss`, included
 in `requirements-ml.txt`).
 
+#### Capture to match predictor
+
+A single command wires a captured clip (or any approved local footage) end to end
+into the match-outcome model: rights-gated YOLO detection, per-match feature
+aggregation, merge with open-event features, and training. Detections are produced
+by `run_yolo_detection`, which enforces the rights gate, and the per-match features
+are joined to `match_results.csv` by `match_id` (optionally alongside open-event
+xG/xT features from `--event-source`). This is the join point that lets captured
+footage train alongside the other disparate data sources.
+
+```bash
+soccer-edge capture to-match-predictor \
+  --input data/raw/video_licensed/captures/screen_001.mp4 \
+  --model-path models/yolov8n.pt --results match_results.csv \
+  --output-dir data/processed/capture_predictor --match-id m1 \
+  --manifest manifests/video_manifest.csv --video-id screen_001 \
+  --event-source examples/statsbomb --stride 5
+```
+
+Omit `--manifest`/`--video-id` only when you pass `--enforce-rights false` for
+synthetic/local testing; production runs require the gate.
+
 ### Match-outcome models
 
 ```bash
@@ -181,6 +203,13 @@ soccer-edge train match-predictor --detections det1.parquet det2.parquet \
 soccer-edge train match-predictor-cnn --detections det1.parquet det2.parquet \
   --results match_results.csv --output-dir data/processed/match_predictor_cnn
 ```
+
+All match-outcome models are keyed by `match_id` and detection-agnostic: the
+per-match CV features (`n_player`, `n_ball`, ball-center, …) are class-aliased so
+that COCO names (`person`, `sports ball`) map to `player`/`ball`, and they merge
+with open-event features (from StatsBomb/Metrica/OpenFootball/football-data) via
+`merge_match_features`. Matches that have detections but no result row are skipped
+because they cannot be labeled.
 
 ### Evaluation → promotion gate
 

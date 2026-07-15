@@ -96,7 +96,7 @@ def test_arrange_yolo_dataset_remaps_class_aliases(tmp_path) -> None:
         ]
     )
     aliases = {"person": "player", "sports ball": "ball"}
-    paths = arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, class_aliases=aliases)
+    arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, class_aliases=aliases)
     train_txt = (tmp_path / "yolo" / "labels" / "train" / "1.txt").read_text(encoding="utf-8").strip().splitlines()
     # person->player (id 0) and sports ball->ball (id 1) survive; bird is dropped.
     assert len(train_txt) == 2

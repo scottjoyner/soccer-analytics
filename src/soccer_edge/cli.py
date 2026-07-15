@@ -72,6 +72,7 @@ from soccer_edge.pipeline.match_predictor import (
     build_match_grid_table_multi,
     build_prediction_dataset_multi,
     match_result_labels,
+    run_capture_to_match_predictor,
     train_match_predictor,
     train_match_predictor_cnn,
 )
@@ -1749,3 +1750,46 @@ def capture_image_cmd(
         manifest=manifest,
         suffix=".png",
     )
+
+
+@capture_app.command("to-match-predictor")
+def capture_to_match_predictor(
+    input_path: Path = typer.Option(..., "--input", exists=True, help="Approved local footage (capture or licensed file)."),
+    model_path: Path = typer.Option(..., exists=True, help="YOLO weights, e.g. yolov8n.pt or a fine-tuned .pt."),
+    results: Path = typer.Option(..., exists=True, help="Match results CSV with match_id,home_score,away_score."),
+    output_dir: Path = typer.Option(Path("data/processed/capture_match_predictor")),
+    match_id: str | None = typer.Option(None, help="Override match id (defaults to video-id or file stem)."),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="Approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
+    event_source: Path | None = typer.Option(None, help="Optional StatsBomb source dir; merges open-event features (xG/xT/pressure) by match_id."),
+    stride: int = typer.Option(1),
+    max_samples: int | None = typer.Option(None),
+    confidence: float = typer.Option(0.25),
+    enforce_rights: bool = typer.Option(True, "--enforce-rights/--no-enforce-rights", help="Enforce the rights gate on the footage (default on)."),
+) -> None:
+    """Capture/footage -> rights-gated YOLO detection -> merged features -> match predictor.
+
+    Wires local footage (incl. screen/webcam captures) into the match-outcome model,
+    optionally merging open-event features (StatsBomb xG/xT/pressure) by match_id so
+    the CV features train alongside the other disparate data sources. The rights gate
+    requires an approved manifest row.
+    """
+
+    res_frame = pd.read_csv(results)
+    paths = run_capture_to_match_predictor(
+        video_path=input_path,
+        results=res_frame,
+        output_dir=output_dir,
+        model_path=model_path,
+        match_id=match_id,
+        rights_manifest=manifest,
+        rights_video_id=video_id,
+        licensed_root=licensed_root,
+        event_source=event_source,
+        stride=stride,
+        max_samples=max_samples,
+        confidence_threshold=confidence,
+        enforce_rights=enforce_rights,
+    )
+    console.print({name: str(path) for name, path in paths.items()})

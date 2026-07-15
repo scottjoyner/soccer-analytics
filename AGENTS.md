@@ -113,6 +113,23 @@ soccer-edge capture screen --detect --object-model-path models/yolov8n.pt --anno
 soccer-edge capture webcam --detect --object-model-path models/yolov8n.pt --duration 30 --device 0 --rights-status owned --rights-reference "license-abc"
 ```
 
+Wire a captured clip (or any approved local footage) straight into the match-outcome
+model — rights-gated YOLO detection, per-match feature aggregation, merge with
+open-event features, and training — by `match_id`:
+
+```bash
+soccer-edge capture to-match-predictor \
+  --input <saved_file> --model-path models/yolov8n.pt --results match_results.csv \
+  --output-dir data/processed/capture_predictor --match-id <video_id> \
+  --manifest manifests/video_manifest.csv --video-id <video_id> \
+  --event-source examples/statsbomb --stride 5
+```
+
+The orchestration lives in `pipeline/match_predictor.run_capture_to_match_predictor`;
+detections are produced by `run_yolo_detection` (which enforces the rights gate) and
+the per-match CV features are joined to the results via `merge_match_features`,
+optionally alongside open-event features loaded by `load_event_features`.
+
 Generate dataset metadata and evaluate object detections:
 
 ```bash
@@ -202,8 +219,19 @@ Completed in recent work:
 6. Harden capture intake: zero-frame captures raise instead of writing a dangling
    manifest row, `--duration` must be positive, the video writer is released on
    error, and the codec is chosen from the output suffix.
-7. Prevent YOLO dataset split leakage: images are grouped by physical file so one
-   image cannot appear in both train and val.
+ 7. Prevent YOLO dataset split leakage: images are grouped by physical file so one
+    image cannot appear in both train and val.
+ 8. Wire capture → YOLO → match predictor: `capture to-match-predictor` runs
+    rights-gated `run_yolo_detection`, aggregates per-match CV features, merges
+    them with open-event features by `match_id` via `merge_match_features`/
+    `load_event_features`, and trains the match-outcome model. The match predictor
+    is detection-agnostic and class-aliased (COCO `person`/`sports ball` →
+    `player`/`ball`) so captured footage trains alongside the other data sources.
+ 9. Close low-severity audit items: `dataset_version` is now required on
+    `ingest write-processed` (no silent `"unknown"`), stream truncation warns via
+    `failed_after_frames`, and the dead `run_local_video_pipeline` stub is
+    repurposed into a real rights-gated `run_yolo_detection` wrapper.
+
 
 Forward-looking:
 

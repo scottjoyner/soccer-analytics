@@ -20,6 +20,7 @@ from sklearn.metrics import mean_squared_error
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.simple_classifier import fit_simple_classifier
+from soccer_edge.video.yolo_pipeline import run_yolo_detection
 
 PLAYER_CLASSES = {"player", "person"}
 BALL_CLASSES = {"ball", "sports ball"}
@@ -100,6 +101,112 @@ def build_prediction_dataset(
         features["away_score"] = int(result["away_score"])
         features["winner"] = derive_winner_label(result["home_score"], result["away_score"])
     return pd.DataFrame([features])
+
+
+def merge_match_features(
+    detections_by_match: dict[str, pd.DataFrame],
+    results: pd.DataFrame,
+    event_features: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Combine CV detection features with open-event features into one labeled dataset.
+
+    Each match is keyed by ``match_id``: per-match aggregates from the detection
+    tables are joined to the match results (home/away score -> winner label) and,
+    when available, to open-event features (xG, xT, pressure, ...). Matches that
+    have detections but no result are skipped (they cannot be labeled). This is the
+    single join point that lets captured-footage CV features train alongside the
+    other disparate data sources.
+    """
+
+    labeled = match_result_labels(results)
+    rows: list[dict] = []
+    for match_id in labeled["match_id"]:
+        detections = detections_by_match.get(match_id)
+        if detections is None:
+            continue
+        row = aggregate_video_features(detections)
+        row["match_id"] = match_id
+        result = labeled[labeled["match_id"] == match_id].iloc[0]
+        row["home_score"] = int(result["home_score"])
+        row["away_score"] = int(result["away_score"])
+        row["winner"] = int(result["winner"])
+        if event_features is not None and len(event_features) > 0:
+            ev = event_features[event_features["match_id"] == match_id]
+            if len(ev) > 0:
+                for column in ev.columns:
+                    if column in ("match_id", "winner", "home_score", "away_score"):
+                        continue
+                    row[column] = ev.iloc[0][column]
+        rows.append(row)
+    if not rows:
+        raise ValueError("no matches in results matched the supplied detection tables")
+    return pd.DataFrame(rows)
+
+
+def load_event_features(source_dir: Path) -> pd.DataFrame:
+    """Build per-match open-event features from a StatsBomb source directory."""
+
+    from soccer_edge.features.statsbomb_features import build_match_event_features
+
+    return build_match_event_features(Path(source_dir))
+
+
+def run_capture_to_match_predictor(
+    video_path: Path,
+    results: pd.DataFrame,
+    output_dir: Path,
+    model_path: str | Path,
+    match_id: str | None = None,
+    rights_manifest: Path | None = None,
+    rights_video_id: str | None = None,
+    licensed_root: Path = Path("data/raw/video_licensed"),
+    event_source: Path | None = None,
+    stride: int = 1,
+    max_samples: int | None = None,
+    confidence_threshold: float = 0.25,
+    enforce_rights: bool = True,
+) -> dict[str, object]:
+    """End-to-end: local footage -> rights-gated YOLO detection -> merged features -> match predictor.
+
+    This is the wiring that lets screen/webcam captures (or any approved local
+    footage) flow into the match-outcome model alongside the other disparate data
+    sources. Detections are produced by run_yolo_detection (which enforces the
+    rights gate), aggregated per match, merged with open-event features when
+    event_source is supplied, and handed to train_match_predictor.
+    """
+
+    output_dir = Path(output_dir)
+    detections_dir = output_dir / "detections"
+    run_yolo_detection(
+        input_path=Path(video_path),
+        output_dir=detections_dir,
+        model_path=model_path,
+        stride=stride,
+        max_samples=max_samples,
+        confidence_threshold=confidence_threshold,
+        rights_manifest=rights_manifest,
+        rights_video_id=rights_video_id,
+        licensed_root=licensed_root,
+        enforce_rights=enforce_rights,
+    )
+    detections_path = detections_dir / "detections.parquet"
+    if not detections_path.exists():
+        detections_path = detections_dir / "detections.csv"
+    detections = pd.read_parquet(detections_path) if detections_path.suffix == ".parquet" else pd.read_csv(detections_path)
+
+    effective_match_id = match_id or (rights_video_id if rights_video_id is not None else Path(video_path).stem)
+    detections_by_match = {effective_match_id: detections}
+    event_features = load_event_features(event_source) if event_source is not None else None
+    dataset = merge_match_features(detections_by_match, results, event_features=event_features)
+    dataset_path = output_dir / "dataset.csv"
+    dataset.to_csv(dataset_path, index=False)
+    bundle = train_match_predictor(dataset, output_dir / "model")
+    return {
+        "dataset": dataset_path,
+        "winner_model": bundle["winner_model"],
+        "predictions": bundle["predictions"],
+        "detections": detections_path,
+    }
 
 
 def _fit_score_regressor(frame: pd.DataFrame, feature_columns: list[str], target: str, output_dir: Path) -> dict[str, Path]:
