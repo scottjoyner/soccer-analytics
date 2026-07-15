@@ -172,6 +172,12 @@ Forward-looking:
    CNN still shows no lift (51.6% sequence / 50.0% match accuracy at baseline;
    winner Brier ~0.62 across seeds), so the promotion gate remains untriggered.
 
+   The `model promotion-gate` command now enforces this automatically: pass
+   `--predictive-metrics` (a table with `accuracy`/`brier` columns),
+   `--majority-baseline-rate`, `--min-accuracy-lift` (default 0.02), and
+   `--max-brier`. The `beats_majority_baseline` and `brier_within_threshold`
+   checks fail the gate when a bundle shows no lift or is uncalibrated.
+
 ## Quality gates
 
 Before committing new work, run:

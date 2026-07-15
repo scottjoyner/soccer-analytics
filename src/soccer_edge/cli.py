@@ -1206,10 +1206,26 @@ def promotion_gate(
     object_metrics: Path = typer.Option(..., exists=True),
     output: Path = typer.Option(Path("data/processed/promotion_gate.md")),
     min_f1: float = typer.Option(0.0),
+    predictive_metrics: Path | None = typer.Option(None, exists=False),
+    majority_baseline_rate: float = typer.Option(0.0),
+    min_accuracy_lift: float = typer.Option(0.02),
+    max_brier: float | None = typer.Option(None),
 ) -> None:
-    """Validate cards, versions, audits, and object metrics before promotion."""
+    """Validate cards, versions, audits, object metrics, and lift over baseline before promotion."""
 
-    path = write_promotion_gate_report(output, model_card_path, data_card_path, dataset_versions, audit_dir, object_metrics, min_f1=min_f1)
+    path = write_promotion_gate_report(
+        output,
+        model_card_path,
+        data_card_path,
+        dataset_versions,
+        audit_dir,
+        object_metrics,
+        min_f1=min_f1,
+        predictive_metrics_path=predictive_metrics,
+        majority_baseline_rate=majority_baseline_rate,
+        min_accuracy_lift=min_accuracy_lift,
+        max_brier=max_brier,
+    )
     console.print(f"wrote={path}")
 
 
