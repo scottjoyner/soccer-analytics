@@ -1,0 +1,5 @@
+{
+  "blocked_keywords": ["youtube", "youtu.be", "twitch", "stream"],
+  "blocked_schemes": ["http://", "https://", "rtmp://", "rtsp://"],
+  "allowed_modalities": ["local_licensed_file"]
+}

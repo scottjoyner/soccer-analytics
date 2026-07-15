@@ -1,7 +1,14 @@
 import pandas as pd
 
+from soccer_edge.player_stats import aggregate_roster_to_team
 
-def build_prematch_table(matches: pd.DataFrame, team_features: pd.DataFrame | None = None) -> pd.DataFrame:
+
+def build_prematch_table(
+    matches: pd.DataFrame,
+    team_features: pd.DataFrame | None = None,
+    player_features: pd.DataFrame | None = None,
+    player_team_col: str = "team_name",
+) -> pd.DataFrame:
     if matches.empty:
         return pd.DataFrame()
     required = {"match_id", "home_team", "away_team"}
@@ -15,6 +22,15 @@ def build_prematch_table(matches: pd.DataFrame, team_features: pd.DataFrame | No
         away_features = team_features.add_prefix("away_").rename(columns={"away_team": "away_team"})
         output = output.merge(home_features, on="home_team", how="left")
         output = output.merge(away_features, on="away_team", how="left")
+
+    if player_features is not None and not player_features.empty and player_team_col in player_features.columns:
+        roster = aggregate_roster_to_team(player_features, team_col=player_team_col)
+        feature_columns = [column for column in roster.columns if column != player_team_col]
+        home_roster = roster.rename(columns={player_team_col: "home_team"})[["home_team", *feature_columns]].copy()
+        home_roster.columns = ["home_team"] + [f"home_{column}" for column in feature_columns]
+        away_roster = home_roster.rename(columns=lambda column: column.replace("home_", "away_", 1))
+        output = output.merge(home_roster, on="home_team", how="left")
+        output = output.merge(away_roster, on="away_team", how="left")
     return output
 
 

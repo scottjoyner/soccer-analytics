@@ -14,7 +14,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from soccer_edge.evaluation.cnn_eval import evaluate_cnn_out_of_sample
+from soccer_edge.evaluation.cnn_eval import (
+    evaluate_cnn_out_of_sample,
+    evaluate_cnn_repeated_cv,
+)
 
 REPO = Path("/home/scott/git/soccer-analytics")
 DET_ROOT = REPO / "data/processed/highlights/detections"
@@ -54,6 +57,8 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=8, help="CNN batch size")
     parser.add_argument("--output-dir", type=str, default=str(OUT), help="output directory for metrics + model")
     parser.add_argument("--seed", type=int, default=0, help="train/test split random seed")
+    parser.add_argument("--folds", type=int, default=1, help="CV folds; >1 enables repeated-CV")
+    parser.add_argument("--repeats", type=int, default=1, help="repeats for repeated stratified CV")
     args = parser.parse_args()
 
     _limit_threads()
@@ -65,6 +70,41 @@ def main() -> int:
         print("No highlight detections found", file=sys.stderr)
         return 1
     print(f"loaded {len(by_match)} matches")
+
+    if args.folds > 1:
+        metrics = evaluate_cnn_repeated_cv(
+            results,
+            by_match,
+            out_dir,
+            n_splits=args.folds,
+            repeats=args.repeats,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            random_state=args.seed,
+        )
+        (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+        print("\n=== Highlight-clip CNN (repeated-CV, held-out matches) ===")
+        print(f"  folds / repeats    : {metrics['n_folds']} / {metrics['repeats']}")
+        print(
+            f"  sequence accuracy  : {metrics['sequence_accuracy_mean']:.3f} "
+            f"+/- {metrics['sequence_accuracy_std']:.3f} "
+            f"(base {metrics['sequence_baseline_accuracy_mean']:.3f} "
+            f"+/- {metrics['sequence_baseline_accuracy_std']:.3f})"
+        )
+        print(
+            f"  match accuracy     : {metrics['match_accuracy_mean']:.3f} "
+            f"+/- {metrics['match_accuracy_std']:.3f} "
+            f"(base {metrics['match_baseline_accuracy_mean']:.3f} "
+            f"+/- {metrics['match_baseline_accuracy_std']:.3f})"
+        )
+        print(
+            f"  winner Brier       : {metrics['winner_brier_mean']:.3f} "
+            f"+/- {metrics['winner_brier_std']:.3f}"
+        )
+        print(f"wrote {out_dir / 'metrics.json'}")
+        return 0
+
     metrics = evaluate_cnn_out_of_sample(
         results,
         by_match,

@@ -4,6 +4,64 @@ from typing import Any
 import pandas as pd
 
 
+def normalize_per_90(value, minutes_played, default: float = 0.0):
+    value_s = pd.Series(value) if pd.api.types.is_list_like(value) else pd.Series([value])
+    minutes_s = pd.Series(minutes_played) if pd.api.types.is_list_like(minutes_played) else pd.Series([minutes_played])
+    minutes_safe = minutes_s.where(minutes_s > 0, 1.0)
+    result = value_s / minutes_safe * 90.0
+    result = result.where(minutes_s > 0, 0.0)
+    result = result.where(value_s.notna() & minutes_s.notna(), default)
+    if not (pd.api.types.is_list_like(value) or pd.api.types.is_list_like(minutes_played)):
+        return float(result.iloc[0])
+    return result
+
+
+def expected_starter_flag(lineup_df, player_id, player_column: str = "player_id", default: float = 0.5):
+    if lineup_df is None or getattr(lineup_df, "empty", True):
+        return default
+    if player_column not in lineup_df.columns:
+        return default
+    if player_id is None:
+        return default
+    starters = set(lineup_df[player_column].dropna())
+    return 1.0 if player_id in starters else 0.0
+
+
+def _starter_flags(player_ids: pd.Series, lineup_df, lineup_player_column: str, default: float = 0.5) -> pd.Series:
+    if lineup_df is None or getattr(lineup_df, "empty", True) or lineup_player_column not in getattr(lineup_df, "columns", []):
+        return pd.Series([default] * len(player_ids), index=player_ids.index, dtype=float)
+    starters = set(lineup_df[lineup_player_column].dropna())
+    return player_ids.map(lambda pid: 1.0 if pid in starters else 0.0).astype(float)
+
+
+def aggregate_roster_to_team(
+    player_features_df: pd.DataFrame,
+    team_col: str = "team_name",
+    starter_col: str = "is_expected_starter",
+) -> pd.DataFrame:
+    if team_col not in player_features_df.columns:
+        raise ValueError(f"missing team column: {team_col}")
+    numeric_columns = [column for column in player_features_df.select_dtypes(include="number").columns if column != team_col]
+    grouped = player_features_df.groupby(team_col)[numeric_columns]
+    agg = grouped.agg(["mean", "min", "max"]).reset_index()
+    flattened: list[str] = [team_col]
+    for column in numeric_columns:
+        for stat in ("mean", "min", "max"):
+            flattened.append(f"{column}_{stat}")
+    agg.columns = flattened
+
+    if starter_col in player_features_df.columns:
+        counts = (
+            player_features_df[player_features_df[starter_col] >= 0.5]
+            .groupby(team_col)[starter_col]
+            .size()
+            .reset_index(name="expected_starter_count")
+        )
+        agg = agg.merge(counts, on=team_col, how="left")
+        agg["expected_starter_count"] = agg["expected_starter_count"].fillna(0).astype(int)
+    return agg
+
+
 def nested_value(value: Any, path: list[str]) -> Any:
     current = value
     for key in path:
@@ -45,7 +103,12 @@ def normalize_event_frame(events: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
-def build_player_match_stats(events: pd.DataFrame) -> pd.DataFrame:
+def build_player_match_stats(
+    events: pd.DataFrame,
+    lineup: pd.DataFrame | None = None,
+    lineup_player_column: str = "player_id",
+    player_id_column: str = "player_name",
+) -> pd.DataFrame:
     normalized = normalize_event_frame(events)
     normalized = normalized.dropna(subset=["_match_id", "_player_name"])
     if normalized.empty:
@@ -66,6 +129,7 @@ def build_player_match_stats(events: pd.DataFrame) -> pd.DataFrame:
                 "tackles",
                 "fouls_committed",
                 "max_minute",
+                "is_expected_starter",
             ]
         )
     normalized["_is_shot"] = normalized["_event_type"].eq("Shot")
@@ -96,6 +160,22 @@ def build_player_match_stats(events: pd.DataFrame) -> pd.DataFrame:
     output = output.rename(columns={"_match_id": "match_id", "_player_name": "player_name", "_team_name": "team_name"})
     output["pass_completion_rate"] = output["completed_passes"] / output["passes"].replace(0, pd.NA)
     output["pass_completion_rate"] = output["pass_completion_rate"].fillna(0.0)
+    for column in [
+        "total_events",
+        "shots",
+        "goals",
+        "passes",
+        "completed_passes",
+        "carries",
+        "dribbles",
+        "pressures",
+        "interceptions",
+        "tackles",
+        "fouls_committed",
+    ]:
+        if column in output.columns:
+            output[f"{column}_per_90"] = normalize_per_90(output[column], output["max_minute"])
+    output["is_expected_starter"] = _starter_flags(output[player_id_column], lineup, lineup_player_column)
     return output
 
 
@@ -218,6 +298,12 @@ def build_player_aggregates(
 
     for column in count_metrics:
         agg[f"avg_{column}"] = agg[f"total_{column}"] / agg["appearances"].replace(0, pd.NA)
+
+    if "max_minute" in frame.columns:
+        total_minutes = grouped["max_minute"].sum().reset_index(name="total_minutes")
+        agg = agg.merge(total_minutes, on=group_keys)
+        for column in count_metrics:
+            agg[f"{column}_per_90"] = normalize_per_90(agg[f"total_{column}"], agg["total_minutes"])
 
     if "completed_passes" in frame.columns and "passes" in frame.columns:
         agg["pass_completion_rate"] = agg["total_completed_passes"] / agg["total_passes"].replace(0, pd.NA)

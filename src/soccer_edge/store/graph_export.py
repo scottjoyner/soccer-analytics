@@ -58,3 +58,13 @@ def annotation_audit_payload(row: object) -> dict[str, Any]:
 def object_evaluation_payload(row: object) -> dict[str, Any]:
     props = ensure_id(row, "evaluation_id", ["class_name", "precision", "recall", "f1"])
     return build_node_payload("ObjectEvaluation", props, key="evaluation_id")
+
+
+def player_match_payload(row: object) -> dict[str, Any]:
+    props = ensure_id(row, "player_match_id", ["match_id", "player_name"])
+    return build_node_payload("PlayerMatch", props, key="player_match_id")
+
+
+def player_form_payload(row: object) -> dict[str, Any]:
+    props = ensure_id(row, "player_form_id", ["player_name", "match_id"])
+    return build_node_payload("PlayerForm", props, key="player_form_id")

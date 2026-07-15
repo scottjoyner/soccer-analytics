@@ -32,3 +32,23 @@ def test_write_graph_payloads_validates_kind(tmp_path) -> None:
     pd.DataFrame([{"x": 1}]).to_csv(source, index=False)
     with pytest.raises(ValueError):
         write_graph_payloads(source, tmp_path / "out.jsonl", "bad-kind")
+
+
+def test_write_graph_payloads_player_match(tmp_path) -> None:
+    source = tmp_path / "player_match.csv"
+    output = tmp_path / "payloads.jsonl"
+    pd.DataFrame([{"match_id": "m1", "player_name": "A", "goals": 2}]).to_csv(source, index=False)
+    path = write_graph_payloads(source, output, "player-match")
+    row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert "PlayerMatch" in row["statement"]
+    assert row["props"]["player_match_id"] == "m1::A"
+
+
+def test_write_graph_payloads_player_form(tmp_path) -> None:
+    source = tmp_path / "player_form.csv"
+    output = tmp_path / "payloads.jsonl"
+    pd.DataFrame([{"player_name": "A", "match_id": "m1", "goals_form_5": 0.3}]).to_csv(source, index=False)
+    path = write_graph_payloads(source, output, "player-form")
+    row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert "PlayerForm" in row["statement"]
+    assert row["props"]["player_form_id"] == "A::m1"

@@ -13,8 +13,9 @@ boundary.
 
 ## What it does
 
-1. **Ingests open data** — StatsBomb Open Data, Metrica Sports sample data, and
-   approved SoccerNet subsets — into normalized, lineage-tagged Parquet tables.
+1. **Ingests open data** — StatsBomb Open Data, Metrica Sports sample data,
+   approved SoccerNet subsets, OpenFootball match results, and football-data.co.uk
+   results — into normalized, lineage-tagged Parquet tables.
 2. **Detects players and the ball** in permitted local video via a YOLOv8
    abstraction (`detect-yolo`), emitting per-frame boxes, tracks, and
    pitch-space states.
@@ -59,6 +60,15 @@ pip install -e ".[dev]"
 pip install -r requirements-ml.txt   # optional: YOLO + PyTorch ML stack
 soccer-edge --help
 ```
+
+> On an **externally-managed** Python (PEP 668) where `pip install` is blocked,
+> or where `python3 -m venv` fails because `python3-venv` is not installed, use
+> one of:
+> - `pip install --break-system-packages -e .` plus the ML requirements (fine for a
+>   dedicated research box); or
+> - `pip install --user virtualenv && python3 -m virtualenv --system-site-packages .venv`
+>   to reuse an already-installed `torch`/`numpy`/`pandas` without re-downloading.
+> The CNN/object-model stack needs `torch`, `ultralytics`, and `opencv-python`.
 
 ---
 
@@ -136,6 +146,14 @@ python scripts/build_highlights_training.py    # aggregate + fine-tune both mode
 python scripts/evaluate_highlights.py          # out-of-sample tabular + calibrated eval
 python scripts/evaluate_cnn.py                 # out-of-sample CNN winner eval (68/30 hold-out)
 SEEDS="0 1 2 3 4" ./scripts/batch_cnn_eval.sh <OUT_ROOT> 10   # off-box seed sweep
+```
+
+For mean±sd across folds (matching the tabular StatsBomb reporting), use the
+repeated-CV variant directly:
+
+```bash
+python scripts/evaluate_cnn.py --folds 5 --repeats 1 --epochs 10 --seed 0 \
+  --output-dir data/processed/highlights/training/cnn_eval_cv
 ```
 
 The original clips are AV1-encoded; the local media reader has no AV1 decoder,

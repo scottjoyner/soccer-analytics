@@ -133,7 +133,11 @@ An event at exactly `t` is already known at prediction time and must not count a
 12. Report out-of-sample metrics behind a leakage-safe hold-out (stratified match
     split), never in-sample only. For the highlight-clip study this is scripted in
     `scripts/evaluate_highlights.py` (tabular) and `scripts/evaluate_cnn.py` (CNN),
-    with `scripts/batch_cnn_eval.sh` sweeping seeds on a batch machine.
+    with `scripts/batch_cnn_eval.sh` sweeping seeds on a batch machine. Use
+    `scripts/evaluate_cnn.py --folds N --repeats R` for a repeated-CV mean±sd report.
+    So far the highlight-clip winner classifiers show **no lift** over the
+    majority-class baseline (CNN: ~51.6% sequence / 50.0% match accuracy; winner
+    Brier ~0.62), confirming short highlight reels carry little score signal.
 
 ## Fine-tuning strategy
 

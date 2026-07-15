@@ -30,8 +30,16 @@ from soccer_edge.features.table_builders import build_inplay_rolling_table, buil
 from soccer_edge.frame_export import export_video_frame_manifest
 from soccer_edge.frame_join import attach_image_paths_from_tables
 from soccer_edge.graph_payload_files import write_annotation_audit_payloads, write_graph_payloads
+from soccer_edge.ingest.football_data_loader import ingest_football_data as run_football_data_ingest
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
-from soccer_edge.ingest.processed_tables import write_metrica_processed, write_soccernet_processed, write_statsbomb_processed
+from soccer_edge.ingest.openfootball_loader import ingest_openfootball as run_openfootball_ingest
+from soccer_edge.ingest.processed_tables import (
+    write_football_data_processed,
+    write_metrica_processed,
+    write_openfootball_processed,
+    write_soccernet_processed,
+    write_statsbomb_processed,
+)
 from soccer_edge.ingest.soccernet_loader import ingest_soccernet as run_soccernet_ingest
 from soccer_edge.ingest.statsbomb_loader import ingest_statsbomb as run_statsbomb_ingest
 from soccer_edge.ingest.video_discovery import append_candidate, build_candidate
@@ -152,6 +160,20 @@ def ingest_soccernet(path: Path = typer.Option(..., exists=False)) -> None:
     console.print(run_soccernet_ingest(path))
 
 
+@ingest_app.command("openfootball")
+def ingest_openfootball(path: Path = typer.Option(..., exists=False)) -> None:
+    """Prepare OpenFootball CSV ingest."""
+
+    console.print(run_openfootball_ingest(path))
+
+
+@ingest_app.command("football-data")
+def ingest_football_data(path: Path = typer.Option(..., exists=False)) -> None:
+    """Prepare football-data.co.uk CSV ingest."""
+
+    console.print(run_football_data_ingest(path))
+
+
 @ingest_app.command("raw-sources")
 def ingest_raw_sources(output: Path = typer.Option(Path("data/processed/raw_data_sources.csv"))) -> None:
     """Write a rights-aware catalog of candidate raw data sources."""
@@ -164,7 +186,7 @@ def ingest_raw_sources(output: Path = typer.Option(Path("data/processed/raw_data
 def ingest_write_processed(
     source: Path = typer.Option(..., exists=True),
     output_dir: Path = typer.Option(Path("data/processed/ingest")),
-    source_type: str = typer.Option(..., help="statsbomb, metrica, or soccernet"),
+    source_type: str = typer.Option(..., help="statsbomb, metrica, soccernet, openfootball, or football-data"),
     dataset_version: str = typer.Option("unknown"),
 ) -> None:
     """Write local source files into processed parquet tables with lineage."""
@@ -175,8 +197,12 @@ def ingest_write_processed(
         paths = write_metrica_processed(source, output_dir, dataset_version)
     elif source_type == "soccernet":
         paths = write_soccernet_processed(source, output_dir, dataset_version)
+    elif source_type == "openfootball":
+        paths = write_openfootball_processed(source, output_dir, dataset_version)
+    elif source_type == "football-data":
+        paths = write_football_data_processed(source, output_dir, dataset_version)
     else:
-        raise typer.BadParameter("source_type must be statsbomb, metrica, or soccernet")
+        raise typer.BadParameter("source_type must be statsbomb, metrica, soccernet, openfootball, or football-data")
     console.print({name: str(path) for name, path in paths.items()})
 
 
@@ -1102,7 +1128,7 @@ def object_confusion(
 def graph_payloads(
     source: Path = typer.Option(..., exists=True),
     output: Path = typer.Option(Path("data/processed/graph_payloads.jsonl")),
-    kind: str = typer.Option(..., help="dataset-version, annotation-audit, or object-evaluation"),
+    kind: str = typer.Option(..., help="dataset-version, annotation-audit, object-evaluation, player-match, or player-form"),
 ) -> None:
     """Write graph payload JSONL for one source table."""
 

@@ -38,6 +38,12 @@ Optional ML and local object model stack:
 pip install -r requirements-ml.txt
 ```
 
+> On an externally-managed Python (PEP 668) where `pip install` is blocked, or
+> where `python3 -m venv` fails because `python3-venv` is missing, install with
+> `pip install --break-system-packages` (dedicated research box) or build a venv
+> with `python3 -m virtualenv --system-site-packages .venv` to reuse an installed
+> `torch`/`numpy`/`pandas`. The ML stack needs `torch`, `ultralytics`, `opencv-python`.
+
 Process open/local data:
 
 ```bash
@@ -113,6 +119,8 @@ split):
 python scripts/evaluate_highlights.py            # tabular winner + score, calibrated
 python scripts/evaluate_cnn.py                   # CNN winner, sequence + match accuracy, Brier
 SEEDS="0 1 2 3 4" ./scripts/batch_cnn_eval.sh <OUT_ROOT> 10   # seed-sweep on a batch machine
+# repeated-CV variant reporting mean +/- sd across folds (matches StatsBomb reporting):
+python scripts/evaluate_cnn.py --folds 5 --repeats 1 --epochs 10 --output-dir <OUT_ROOT>_cv
 ```
 
 The CNN evaluation caps PyTorch threads (`OMP_NUM_THREADS`, default 8) to avoid
@@ -145,15 +153,17 @@ Completed in recent work:
    (`scripts/batch_cnn_eval.sh`) for off-box compute.
 2. Add leakage-safe, calibrated out-of-sample tabular evaluation
    (`scripts/evaluate_highlights.py`).
+3. Add a repeated-CV variant of the CNN out-of-sample eval (`--folds`/`--repeats`)
+   reporting mean±sd, like the StatsBomb results.
 
 Forward-looking:
 
-1. Add a repeated-CV variant of the CNN out-of-sample eval to report ± bounds
-   like the StatsBomb results.
-2. Extend the highlight study with full-match footage or richer open event data
+1. Extend the highlight study with full-match footage or richer open event data
    once rights-clean sources are available.
-3. Promote a model bundle through the promotion-gate command once a rights-clean
-   source yields lift over the majority-class baseline.
+2. Promote a model bundle through the promotion-gate command once a rights-clean
+   source yields lift over the majority-class baseline. Note: the highlight-clip
+   CNN still shows no lift (51.6% sequence / 50.0% match accuracy at baseline;
+   winner Brier ~0.62 across seeds), so the promotion gate remains untriggered.
 
 ## Quality gates
 

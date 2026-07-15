@@ -4,6 +4,8 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
+from soccer_edge.video.modality_rules import ModalityRules
+
 PROCESSABLE_RIGHTS_STATUSES = {"owned", "licensed", "compatible_license"}
 VALID_CLIP_TYPES = {"full_match", "goal_montage", "highlight", "training_clip", "unknown"}
 
@@ -74,7 +76,11 @@ def find_manifest_row(manifest_path: Path, video_id: str) -> VideoManifestRow | 
     return None
 
 
-def validate_processable_video(row: VideoManifestRow, licensed_root: Path) -> None:
+def validate_processable_video(
+    row: VideoManifestRow,
+    licensed_root: Path,
+    modality_rules: ModalityRules | None = None,
+) -> None:
     if not row.is_processable:
         raise ValueError(f"Video {row.video_id} is not processable: rights_status={row.rights_status}")
 
@@ -82,6 +88,14 @@ def validate_processable_video(row: VideoManifestRow, licensed_root: Path) -> No
         raise ValueError(
             f"Video {row.video_id} is missing a recorded rights_reference; "
             "explicit written rights must be recorded before processing."
+        )
+
+    rules = modality_rules or ModalityRules.default()
+    blocked = rules.blocked_reason(row)
+    if blocked is not None:
+        raise ValueError(
+            f"Video {row.video_id} uses blocked modality {blocked!r}: "
+            "public/remote sources are discovery metadata only and cannot be processed."
         )
 
     root = licensed_root.resolve()

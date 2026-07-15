@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import RepeatedStratifiedKFold, train_test_split
 
 from soccer_edge.models.bundle import load_bundle
 from soccer_edge.models.cnn_runner import train_cnn_from_npz
@@ -55,28 +55,16 @@ def _build_sequences(
     return np.stack(samples).astype(np.float32), np.asarray(labels, dtype=np.int64), np.asarray(mids)
 
 
-def evaluate_cnn_out_of_sample(
+def _run_single_split(
     results: pd.DataFrame,
     detections_by_match: dict[str, pd.DataFrame],
     output_dir: Path,
-    test_size: float = 0.3,
+    train_ids: list[str],
+    test_ids: list[str],
     sequence_length: int = SEQUENCE_LENGTH,
     epochs: int = 5,
     batch_size: int = 8,
-    random_state: int = 0,
 ) -> dict:
-    require_torch()
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    common = [m for m in results["match_id"].astype(str) if m in detections_by_match]
-    sub = results[results["match_id"].astype(str).isin(common)].copy()
-    sub["match_id"] = sub["match_id"].astype(str)
-    strata = sub.set_index("match_id")["winner"].loc[common]
-    train_ids, test_ids = train_test_split(
-        common, test_size=test_size, stratify=strata, random_state=random_state
-    )
-
     train_grid = build_match_grid_table_multi(
         results[results["match_id"].astype(str).isin(train_ids)],
         {m: detections_by_match[m] for m in train_ids},
@@ -142,4 +130,105 @@ def evaluate_cnn_out_of_sample(
         "match_accuracy": match_accuracy,
         "match_baseline_accuracy": base_match_accuracy,
         "winner_brier": brier,
+    }
+
+
+def evaluate_cnn_out_of_sample(
+    results: pd.DataFrame,
+    detections_by_match: dict[str, pd.DataFrame],
+    output_dir: Path,
+    test_size: float = 0.3,
+    sequence_length: int = SEQUENCE_LENGTH,
+    epochs: int = 5,
+    batch_size: int = 8,
+    random_state: int = 0,
+) -> dict:
+    require_torch()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    common = [m for m in results["match_id"].astype(str) if m in detections_by_match]
+    sub = results[results["match_id"].astype(str).isin(common)].copy()
+    sub["match_id"] = sub["match_id"].astype(str)
+    strata = sub.set_index("match_id")["winner"].loc[common]
+    train_ids, test_ids = train_test_split(
+        common, test_size=test_size, stratify=strata, random_state=random_state
+    )
+
+    return _run_single_split(
+        results,
+        detections_by_match,
+        output_dir,
+        train_ids,
+        test_ids,
+        sequence_length=sequence_length,
+        epochs=epochs,
+        batch_size=batch_size,
+    )
+
+
+def evaluate_cnn_repeated_cv(
+    results: pd.DataFrame,
+    detections_by_match: dict[str, pd.DataFrame],
+    output_dir: Path,
+    n_splits: int = 5,
+    repeats: int = 1,
+    epochs: int = 5,
+    batch_size: int = 8,
+    random_state: int = 0,
+) -> dict:
+    require_torch()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    common = [m for m in results["match_id"].astype(str) if m in detections_by_match]
+    common = sorted(common)
+    sub = results[results["match_id"].astype(str).isin(common)].copy()
+    sub["match_id"] = sub["match_id"].astype(str)
+    y = sub.set_index("match_id")["winner"].loc[common].to_numpy()
+    x_idx = np.arange(len(common))
+
+    rskf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=repeats, random_state=random_state)
+    per_fold: list[dict] = []
+    for k, (train_pos, test_pos) in enumerate(rskf.split(x_idx, y)):
+        fold_dir = output_dir / f"fold_{k}"
+        fold_dir.mkdir(parents=True, exist_ok=True)
+        train_ids = [common[i] for i in train_pos]
+        test_ids = [common[i] for i in test_pos]
+        fold_metrics = _run_single_split(
+            results,
+            detections_by_match,
+            fold_dir,
+            train_ids,
+            test_ids,
+            epochs=epochs,
+            batch_size=batch_size,
+        )
+        per_fold.append(fold_metrics)
+
+    def _mean_std(values: list[float]) -> tuple[float, float]:
+        arr = np.asarray(values, dtype=np.float64)
+        return float(arr.mean()), float(arr.std())
+
+    seq_acc_mean, seq_acc_std = _mean_std([f["sequence_accuracy"] for f in per_fold])
+    seq_base_mean, seq_base_std = _mean_std([f["sequence_baseline_accuracy"] for f in per_fold])
+    match_acc_mean, match_acc_std = _mean_std([f["match_accuracy"] for f in per_fold])
+    match_base_mean, match_base_std = _mean_std([f["match_baseline_accuracy"] for f in per_fold])
+    brier_mean, brier_std = _mean_std([f["winner_brier"] for f in per_fold])
+
+    return {
+        "n_splits": n_splits,
+        "repeats": repeats,
+        "n_folds": len(per_fold),
+        "per_fold": per_fold,
+        "sequence_accuracy_mean": seq_acc_mean,
+        "sequence_accuracy_std": seq_acc_std,
+        "sequence_baseline_accuracy_mean": seq_base_mean,
+        "sequence_baseline_accuracy_std": seq_base_std,
+        "match_accuracy_mean": match_acc_mean,
+        "match_accuracy_std": match_acc_std,
+        "match_baseline_accuracy_mean": match_base_mean,
+        "match_baseline_accuracy_std": match_base_std,
+        "winner_brier_mean": brier_mean,
+        "winner_brier_std": brier_std,
     }

@@ -13,6 +13,8 @@ Use these sources first because they can bootstrap features, labels, schema vali
 | StatsBomb Open Data | Event data, lineups, selected 360 freeze-frame context | `soccer-edge ingest write-processed --source <statsbomb-root> --source-type statsbomb` | Public research/open-data use; attribution required by source terms. |
 | Metrica Sports Sample Data | Tracking and event synchronization, pitch coordinate normalization, possession/pressure features | `soccer-edge ingest write-processed --source <metrica-root> --source-type metrica` | Sample data for public analysis; acknowledge source. |
 | SoccerNet annotations | Benchmark labels for action spotting, calibration, tracking-style tasks, depending on subset access | `soccer-edge ingest write-processed --source <soccernet-root> --source-type soccernet` | Respect SoccerNet access terms and task-specific data restrictions. |
+| OpenFootball results | Open match/results CSVs (date, teams, scores, competition, season) | `soccer-edge ingest openfootball --path <csv>` or `soccer-edge ingest write-processed --source <csv> --source-type openfootball` | Community open-data project; attribute the source. |
+| football-data.co.uk | Historical results CSVs (Div, Date, HomeTeam, AwayTeam, FTHG, FTAG, FTR) | `soccer-edge ingest football-data --path <csv>` or `soccer-edge ingest write-processed --source <csv> --source-type football-data` | Free historical data for non-commercial use; respect the site terms. |
 
 ### Tier 2 — Licensed or owned local footage
 
@@ -26,6 +28,12 @@ Approved locations:
 - Partner-provided footage where written processing rights are recorded.
 
 Never use a public URL as a media input unless written rights are recorded in the local manifest.
+
+The rights gate also enforces a **modality blocklist** (`configs/modality_rules.json`):
+rows whose `source_url` or `clip_type` reference blocked modalities (`youtube`,
+`youtu.be`, `twitch`, `stream`, or any `http(s)/rtmp/rtsp` scheme) are rejected by
+`validate_processable_video`, so public/remote sources stay discovery metadata only
+and can never become processing inputs.
 
 Required manifest columns:
 

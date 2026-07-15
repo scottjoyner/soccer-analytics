@@ -211,9 +211,9 @@
 
 ## Immediate next commits
 
-1. Add player per-90 and minutes-adjusted feature normalization.
-2. Add lineup-aware expected-starter features and team roster aggregation.
-3. Add raw-source manifest validation against allowed/blocked modality rules.
-4. Add graph payload file writers for player-match and player-form features.
-5. Add source-specific ingestion adapters for OpenFootball and football-data.co.uk CSVs.
-6. Add a repeated-CV variant of the out-of-sample CNN evaluation to report ± bounds.
+- [x] Add player per-90 and minutes-adjusted feature normalization.
+- [x] Add lineup-aware expected-starter features and team roster aggregation.
+- [x] Add raw-source manifest validation against allowed/blocked modality rules.
+- [x] Add graph payload file writers for player-match and player-form features.
+- [x] Add source-specific ingestion adapters for OpenFootball and football-data.co.uk CSVs.
+- [x] Add a repeated-CV variant of the out-of-sample CNN evaluation to report ± bounds.

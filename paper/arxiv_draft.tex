@@ -85,12 +85,22 @@ manifest row is named, the footage file is opened only if its
 matches the input. This makes the rights check a hard, test-covered gate rather
 than documentation.
 
+We further harden the gate with a \emph{modality blocklist}
+(\texttt{configs/modality\_rules.json}) enforced inside
+\texttt{validate\_processable\_video}: any manifest row whose
+\texttt{source\_url} or \texttt{clip\_type} references a blocked modality
+(\texttt{youtube}, \texttt{youtu.be}, \texttt{twitch}, \texttt{stream}, or any
+\texttt{http(s)/rtmp/rtsp} scheme) is rejected outright. This guarantees that
+public or remote URLs stay discovery metadata only and can never become
+processing inputs, even if a manifest row is otherwise well formed.
+
 \section{Data}
 \paragraph{Open event data.} StatsBomb Open Data, Metrica sample events/tracking,
-and approved SoccerNet subsets are ingested into normalized Parquet tables with
-lineage. From these we derive per-match player statistics (shots, passes,
-carries, pressures, interceptions, tackles, fouls) and cross-match aggregates
-with per-player totals, per-match averages, and team/opponent splits.
+approved SoccerNet subsets, OpenFootball match-result archives, and
+football-data.co.uk historical results are ingested into normalized Parquet
+tables with lineage. From these we derive per-match player statistics (shots,
+passes, carries, pressures, interceptions, tackles, fouls) and cross-match
+aggregates with per-player totals, per-match averages, and team/opponent splits.
 
 \paragraph{Permitted local footage.} For this study we use 98 FIFA World Cup 2026
 highlight clips that were provided to the authors as permitted local files.
@@ -123,7 +133,13 @@ $3\times 8\times 8$) for the convolutional model.
 Player statistics are aggregated with \texttt{build\_player\_aggregates}, which
 yields cross-match totals, per-match averages, appearances, and an overall pass
 completion rate, with optional \texttt{split\_by=team} and
-\texttt{split\_by=opponent} breakdowns. For the highlight study, filename parsing
+\texttt{split\_by=opponent} breakdowns. Rate and count features are additionally
+normalized to a \emph{per-90-minutes} basis via \texttt{normalize\_per\_90} so
+that players with different minutes are comparable, and \texttt{expected\_starter\_flag}
+encodes lineup-aware expected-starter status (defaulting to an unknown state when
+no lineup is supplied). Player features are rolled up to the team level with
+\texttt{aggregate\_roster\_to\_team}, which adds team-mean/min/max aggregates and
+an expected-starter count. For the highlight study, filename parsing
 produced a 98-match results table (50 distinct teams) that supplies the
 supervisory labels (winner, home/away score) for the outcome models.
 
@@ -197,10 +213,13 @@ supervision---precisely the signal source the highlight-clip features lack.
 count nor the track detection features outperform the majority-class baseline
 for winner prediction, and the calibrated Brier scores ($\approx0.61$) confirm
 the probabilities are no better than chance. The out-of-sample CNN evaluation
-agrees: on the 30-match held-out split it reaches 51.6\% sequence accuracy and
-50.0\% match accuracy---both at the majority-class baseline---with a winner
-Brier of 0.617. The deep model therefore reproduces the same null result as the
-tabular features, rather than uncovering signal the counts miss. This is the
+agrees: over a 5-seed $\times$ 10-epoch sweep it reaches
+$50.6\%\ (\pm0.8)$ sequence accuracy and $50.0\%$ match accuracy---both at the
+majority-class baseline---with a winner Brier of $0.624\ (\pm0.005)$. These
+figures are produced by the repeated-CV variant of the evaluation
+(\texttt{--folds}/\texttt{--repeats}), which reports mean$\pm$sd across a
+stratified match hold-out; the deep model therefore reproduces the same null
+result as the tabular features, rather than uncovering signal the counts miss. This is the
 expected and, we argue,
 informative result: short highlight reels are highlight-selected (not
 representative of open play), contain far fewer frames than a full match, and
@@ -219,9 +238,15 @@ The study is scripted and re-runnable: \texttt{scripts/process\_highlights\_batc
 tabular + calibrated evaluation), \texttt{scripts/evaluate\_cnn.py}
 (out-of-sample CNN winner evaluation, stratified 68/30 match hold-out), and
 \texttt{scripts/batch\_cnn\_eval.sh} (seed-sweep wrapper for off-box batch
-compute). A data card and a zipped bundle of the processed tables ship with the
-repository, and every derived table carries lineage and \texttt{rights\_reference}
-fields.
+compute), plus a repeated-CV variant \texttt{scripts/evaluate\_cnn.py
+--folds 5 --repeats 1} that reports mean$\pm$sd across folds. A data card and a
+zipped bundle of the processed tables ship with the repository, and every
+derived table carries lineage and \texttt{rights\_reference} fields. The
+pipeline's graph-export payloads (Neo4j JSONL) now cover dataset versions,
+annotation audits, object-evaluation summaries, and \emph{player-match} and
+\emph{player-form} feature nodes, so derived features are themselves
+lineage-tracked; the fine-tuning and evaluation stack runs CPU-only on the
+batch machine (PyTorch CPU, capped threads).
 
 \section{Limitations and Ethics}
 The system intentionally cannot ingest scraped or unlicensed media; researchers
@@ -238,7 +263,9 @@ includes calibrating the detector on full-match footage, fitting the xT
 surface per cross-validation fold (currently league-wide, a negligible leakage
 given its aggregate nature), and adding tracking-derived possession features;
 the feature scaler, calibrated classifier, repeated cross-validated evaluation,
-and an open event-data model with expected threat are already in place.
+per-90/lineup-aware player features, the modality-blocklist rights gate, an open
+event-data model with expected threat, and player-match/player-form graph
+payloads are already in place.
 
 \bibliographystyle{plain}
 \begin{thebibliography}{9}

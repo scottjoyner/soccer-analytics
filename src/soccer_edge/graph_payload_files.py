@@ -4,7 +4,13 @@ from typing import Callable
 
 import pandas as pd
 
-from soccer_edge.store.graph_export import annotation_audit_payload, dataset_version_payload, object_evaluation_payload
+from soccer_edge.store.graph_export import (
+    annotation_audit_payload,
+    dataset_version_payload,
+    object_evaluation_payload,
+    player_form_payload,
+    player_match_payload,
+)
 
 PayloadBuilder = Callable[[dict], dict]
 
@@ -13,6 +19,8 @@ PAYLOAD_BUILDERS: dict[str, PayloadBuilder] = {
     "dataset-version": dataset_version_payload,
     "annotation-audit": annotation_audit_payload,
     "object-evaluation": object_evaluation_payload,
+    "player-match": player_match_payload,
+    "player-form": player_form_payload,
 }
 
 

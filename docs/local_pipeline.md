@@ -32,7 +32,7 @@ soccer-edge model predict-cnn --bundle-dir data/processed/cnn_model --source dat
 soccer-edge model calibration-review-cnn --bundle-dir data/processed/cnn_model --source data/processed/tensor_samples.npz --output-dir data/processed/cnn_calibration_review
 ```
 
-Local media processing remains restricted to files you have rights to process. The media reader gate uses optional OpenCV support, and the media inference adapter converts local model outputs into table-ready rows. Every command that opens raw footage (`export-frames`, `process`, `process-local-model`, `detect-yolo`, `train player-ball`, and `train local-finetune` run mode) enforces a rights gate: pass `--manifest` and `--video-id` pointing at an approved `catalog-local` row whose `rights_reference` is recorded and whose `local_path` matches the input. Omitting these flags keeps the legacy trust-local-file behavior.
+Local media processing remains restricted to files you have rights to process. The media reader gate uses optional OpenCV support, and the media inference adapter converts local model outputs into table-ready rows. Every command that opens raw footage (`export-frames`, `process`, `process-local-model`, `detect-yolo`, `train player-ball`, and `train local-finetune` run mode) enforces a rights gate: pass `--manifest` and `--video-id` pointing at an approved `catalog-local` row whose `rights_reference` is recorded and whose `local_path` matches the input. Omitting these flags keeps the legacy trust-local-file behavior. The gate additionally enforces a modality blocklist (`configs/modality_rules.json`) that rejects public/remote sources (`youtube`, `twitch`, `stream`, `http(s)/rtmp/rtsp`). The in-repo `configs/pitch_calibration.json` and `models/local-object-model.pt` (a YOLOv8n base detector) are provided so the fine-tuning path runs without external downloads.
 
 ```bash
 soccer-edge video catalog-local --root data/raw/video_licensed --output manifests/local_video_manifest.csv --rights-status owned --rights-reference <written-rights-reference>
@@ -61,6 +61,8 @@ soccer-edge model source-catalog --output data/processed/training_sources.csv
 soccer-edge model object-eval --source data/processed/object_eval_rows.csv --output data/processed/object_eval.csv
 soccer-edge model object-confusion --source data/processed/object_eval_rows.csv --table-output data/processed/object_confusion.csv --svg-output data/processed/object_confusion.svg
 soccer-edge model graph-payloads --source data/processed/dataset_versions.csv --output data/processed/dataset_version_payloads.jsonl --kind dataset-version
+soccer-edge model graph-payloads --source data/processed/player_match_stats.csv --output data/processed/player_match_payloads.jsonl --kind player-match
+soccer-edge model graph-payloads --source data/processed/player_form.csv --output data/processed/player_form_payloads.jsonl --kind player-form
 soccer-edge model graph-audit-payloads --audit-dir data/processed/annotation_audit --output data/processed/annotation_audit_payloads.jsonl
 soccer-edge model graph-payloads --source data/processed/object_eval.csv --output data/processed/object_eval_payloads.jsonl --kind object-evaluation
 soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/crop_manifest.csv --output data/processed/DATA_CARD.md --version-paths data/processed/frame_manifest.csv,data/processed/corrected_detections.csv,data/processed/annotations/train.csv,data/processed/annotations/val.csv
