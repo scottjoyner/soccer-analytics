@@ -67,6 +67,8 @@ def run_local_finetune_pipeline(
     image_width: float = 1920.0,
     image_height: float = 1080.0,
     train_object_model: bool = False,
+    object_epochs: int = 50,
+    object_image_size: int = 640,
 ) -> LocalFinetuneOutputs:
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs = local_finetune_outputs(output_dir)
@@ -116,6 +118,8 @@ def run_local_finetune_pipeline(
                 data_config=outputs.annotation_config,
                 base_model=base_model_path,
                 output_dir=output_dir / "object_training",
+                epochs=object_epochs,
+                image_size=object_image_size,
             )
         )
     return outputs

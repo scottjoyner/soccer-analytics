@@ -2,7 +2,11 @@ import json
 
 import pandas as pd
 
-from soccer_edge.evaluation.promotion_metrics import read_predictive_table, write_predictive_metrics
+from soccer_edge.evaluation.promotion_metrics import (
+    read_predictive_table,
+    write_classification_predictive_metrics,
+    write_predictive_metrics,
+)
 
 
 def test_cnn_single_metrics(tmp_path) -> None:
@@ -50,3 +54,17 @@ def test_write_predictive_metrics(tmp_path) -> None:
     frame = pd.read_csv(path)
     assert frame.iloc[0]["model"] == "cnn-v1"
     assert frame.iloc[0]["accuracy"] == 0.51
+
+
+def test_write_classification_predictive_metrics(tmp_path) -> None:
+    from soccer_edge.models.metrics import ClassificationMetrics
+
+    metrics = ClassificationMetrics(log_loss=0.7, brier_score=0.31, accuracy=0.62)
+    out = tmp_path / "pred.csv"
+    path = write_classification_predictive_metrics(metrics, out, model_name="tabular-v1")
+    assert path.exists()
+    frame = pd.read_csv(path)
+    assert frame.iloc[0]["model"] == "tabular-v1"
+    assert frame.iloc[0]["accuracy"] == 0.62
+    assert frame.iloc[0]["brier"] == 0.31
+

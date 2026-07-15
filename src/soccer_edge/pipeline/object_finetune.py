@@ -28,6 +28,8 @@ def run_player_ball_finetune(
     image_width: float = 1920.0,
     image_height: float = 1080.0,
     train_object_model: bool = True,
+    object_epochs: int = 50,
+    object_image_size: int = 640,
 ) -> LocalFinetuneOutputs:
     return run_local_finetune_pipeline(
         input_path=input_path,
@@ -43,4 +45,6 @@ def run_player_ball_finetune(
         image_width=image_width,
         image_height=image_height,
         train_object_model=train_object_model,
+        object_epochs=object_epochs,
+        object_image_size=object_image_size,
     )

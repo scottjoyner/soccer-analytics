@@ -61,3 +61,22 @@ def write_predictive_metrics(metrics_json_path: Path, output_path: Path, model_n
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(frame.to_csv(index=False), encoding="utf-8")
     return output_path
+
+
+def write_classification_predictive_metrics(metrics, output_path: Path, model_name: str = "model", split: str = "eval") -> Path:
+    """Write a promotion-gate predictive metrics CSV from a ClassificationMetrics object."""
+
+    frame = pd.DataFrame(
+        [
+            {
+                "model": model_name,
+                "accuracy": float(metrics.accuracy),
+                "brier": float(metrics.brier_score),
+                "baseline_accuracy": None,
+                "split": split,
+            }
+        ]
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(frame.to_csv(index=False), encoding="utf-8")
+    return output_path

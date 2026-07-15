@@ -24,7 +24,7 @@ from soccer_edge.correction_review_ui import write_correction_review_assets
 from soccer_edge.crop_export import export_image_crops_from_table
 from soccer_edge.dataset_versioning import write_dataset_versions
 from soccer_edge.evaluation.calibration_review import write_calibration_review
-from soccer_edge.evaluation.promotion_metrics import write_predictive_metrics
+from soccer_edge.evaluation.promotion_metrics import write_classification_predictive_metrics, write_predictive_metrics
 from soccer_edge.evaluation.replay import replay_predictions
 from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
@@ -816,6 +816,8 @@ def train_local_finetune(
     train_fraction: float = typer.Option(0.8),
     threshold: float = typer.Option(0.5),
     train_object_model: bool = typer.Option(False),
+    object_epochs: int = typer.Option(50),
+    object_image_size: int = typer.Option(640),
     dry_run_plan: Path | None = typer.Option(None, exists=False),
     validate_plan_inputs: bool = typer.Option(False),
     manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
@@ -856,6 +858,8 @@ def train_local_finetune(
         train_fraction=train_fraction,
         threshold=threshold,
         train_object_model=train_object_model,
+        object_epochs=object_epochs,
+        object_image_size=object_image_size,
     )
     console.print({name: str(path) if path is not None else None for name, path in outputs.__dict__.items()})
 
@@ -953,6 +957,8 @@ def train_player_ball_cmd(
     train_fraction: float = typer.Option(0.8),
     threshold: float = typer.Option(0.5),
     train_object_model: bool = typer.Option(True),
+    object_epochs: int = typer.Option(50),
+    object_image_size: int = typer.Option(640),
     manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
     video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
     licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
@@ -975,6 +981,8 @@ def train_player_ball_cmd(
         train_fraction=train_fraction,
         threshold=threshold,
         train_object_model=train_object_model,
+        object_epochs=object_epochs,
+        object_image_size=object_image_size,
     )
     console.print({name: str(path) if path is not None else None for name, path in outputs.__dict__.items()})
 
@@ -1317,12 +1325,19 @@ def calibration_review_cnn(
 
 
 @model_app.command("evaluate")
-def evaluate_model(predictions: Path = typer.Option(..., exists=True)) -> None:
+def evaluate_model(
+    predictions: Path = typer.Option(..., exists=True),
+    output: Path | None = typer.Option(None, help="Optional promotion-gate predictive metrics CSV."),
+    model_name: str | None = typer.Option(None),
+) -> None:
     """Evaluate a CSV or parquet file with label/probability columns."""
 
     frame = pd.read_parquet(predictions) if predictions.suffix == ".parquet" else pd.read_csv(predictions)
     result = replay_predictions(frame)
     console.print(result)
+    if output is not None:
+        path = write_classification_predictive_metrics(result.metrics, output, model_name=model_name or "model")
+        console.print(f"wrote={path}")
 
 
 @model_app.command("calibration-review")
