@@ -13,6 +13,7 @@ import pandas as pd
 
 from soccer_edge.pipeline.match_predictor import build_prediction_dataset_multi
 from soccer_edge.video.track_features import build_track_dataset, evaluate_match_predictor
+from soccer_edge.evaluation.promotion_metrics import write_predictive_metrics
 
 REPO = Path("/home/scott/git/soccer-analytics")
 DET_ROOT = REPO / "data/processed/highlights/detections"
@@ -43,6 +44,7 @@ def main():
 
     out = {"v1_count_features": v1_metrics, "v2_track_features": v2_metrics}
     (OUT / "metrics.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    write_predictive_metrics(OUT / "metrics.json", OUT / "predictive_metrics.csv", model_name="tabular-highlight")
 
     print("=== V1 (count features) ===")
     for k, val in v1_metrics.items():

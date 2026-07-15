@@ -18,6 +18,7 @@ from soccer_edge.evaluation.cnn_eval import (
     evaluate_cnn_out_of_sample,
     evaluate_cnn_repeated_cv,
 )
+from soccer_edge.evaluation.promotion_metrics import write_predictive_metrics
 
 REPO = Path("/home/scott/git/soccer-analytics")
 DET_ROOT = REPO / "data/processed/highlights/detections"
@@ -83,6 +84,7 @@ def main() -> int:
             random_state=args.seed,
         )
         (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+        write_predictive_metrics(out_dir / "metrics.json", out_dir / "predictive_metrics.csv", model_name="cnn-highlight")
 
         print("\n=== Highlight-clip CNN (repeated-CV, held-out matches) ===")
         print(f"  folds / repeats    : {metrics['n_folds']} / {metrics['repeats']}")
@@ -114,6 +116,7 @@ def main() -> int:
         random_state=args.seed,
     )
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    write_predictive_metrics(out_dir / "metrics.json", out_dir / "predictive_metrics.csv", model_name="cnn-highlight")
 
     print("\n=== Highlight-clip CNN (out-of-sample, held-out matches) ===")
     print(f"  train/test matches : {metrics['n_train_matches']} / {metrics['n_test_matches']}")
