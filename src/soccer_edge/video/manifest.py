@@ -69,6 +69,57 @@ def manifest_row_from_dict(row: dict[str, str]) -> VideoManifestRow:
     )
 
 
+MANIFEST_FIELDS = [
+    "video_id",
+    "match_id",
+    "competition",
+    "season",
+    "home_team",
+    "away_team",
+    "clip_type",
+    "source_url",
+    "local_path",
+    "period",
+    "start_match_second",
+    "end_match_second",
+    "rights_status",
+    "rights_reference",
+    "notes",
+]
+
+
+def manifest_row_to_dict(row: VideoManifestRow) -> dict[str, str]:
+    return {
+        "video_id": row.video_id,
+        "match_id": row.match_id,
+        "competition": row.competition,
+        "season": row.season,
+        "home_team": row.home_team,
+        "away_team": row.away_team,
+        "clip_type": row.clip_type,
+        "source_url": row.source_url,
+        "local_path": str(row.local_path),
+        "period": row.period,
+        "start_match_second": "" if row.start_match_second is None else str(row.start_match_second),
+        "end_match_second": "" if row.end_match_second is None else str(row.end_match_second),
+        "rights_status": row.rights_status,
+        "rights_reference": row.rights_reference,
+        "notes": row.notes,
+    }
+
+
+def append_manifest_row(manifest_path: Path, row: VideoManifestRow) -> Path:
+    manifest_path = Path(manifest_path)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    exists = manifest_path.exists()
+    with manifest_path.open("a", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MANIFEST_FIELDS)
+        if not exists:
+            writer.writeheader()
+        writer.writerow(manifest_row_to_dict(row))
+    return manifest_path
+
+
 def find_manifest_row(manifest_path: Path, video_id: str) -> VideoManifestRow | None:
     for row in read_video_manifest(manifest_path):
         if row.video_id == video_id:

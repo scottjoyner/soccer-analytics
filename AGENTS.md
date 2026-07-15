@@ -83,6 +83,26 @@ an `image_path` column, so `train object-model` can consume it directly. The ful
 at `annotations/yolo/data.yaml`). The `annotation-config` command alone only writes a
 `data.yaml` and assumes you have already arranged the `images/`+`labels/` directories.
 
+Capture local footage for intake:
+
+```bash
+soccer-edge capture screen --duration 30 --fps 20 --rights-status owned --rights-reference "license-abc"
+soccer-edge capture webcam --duration 30 --device 0 --rights-status owned --rights-reference "license-abc"
+soccer-edge capture image --rights-status owned --rights-reference "license-abc"
+```
+
+The `capture` commands record screen/webcam/video or a screenshot to
+`data/raw/video_licensed/captures/` and append a rights-gated manifest row (source scheme
+`capture://screen|webcam|image`). Every capture requires `rights_status` in
+{owned, licensed, compatible_license} and a recorded `rights_reference`; the command refuses
+to capture otherwise. This is for content you own or are licensed/compatible-license for —
+capturing third-party streams (YouTube, Twitch, etc.) is prohibited (see Hard safety and
+data rules). After capture, feed the saved file straight into the rights-gated pipeline:
+
+```bash
+soccer-edge train local-finetune --input <saved_file> --manifest manifests/video_manifest.csv --video-id <video_id> --object-model-path models/yolov8n.pt
+```
+
 Generate dataset metadata and evaluate object detections:
 
 ```bash

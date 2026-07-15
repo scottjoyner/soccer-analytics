@@ -30,6 +30,7 @@ from soccer_edge.example_pipeline import run_tiny_example_pipeline
 from soccer_edge.features.table_builders import build_inplay_rolling_table, build_prematch_table
 from soccer_edge.frame_export import export_video_frame_manifest
 from soccer_edge.frame_join import attach_image_paths_from_tables
+from soccer_edge.capture import _require_rights, capture_and_register, default_capture_output, parse_region
 from soccer_edge.graph_payload_files import write_annotation_audit_payloads, write_graph_payloads
 from soccer_edge.ingest.football_data_loader import ingest_football_data as run_football_data_ingest
 from soccer_edge.ingest.metrica_loader import ingest_metrica as run_metrica_ingest
@@ -98,6 +99,7 @@ features_app = typer.Typer(help="Build model feature tables.")
 train_app = typer.Typer(help="Train probability models.")
 model_app = typer.Typer(help="Save, score, and inspect model outputs.")
 examples_app = typer.Typer(help="Run tiny local examples.")
+capture_app = typer.Typer(help="Capture local screen/webcam/image footage for the pipeline (rights-gated).")
 
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(discover_app, name="discover")
@@ -106,6 +108,7 @@ app.add_typer(features_app, name="features")
 app.add_typer(train_app, name="train")
 app.add_typer(model_app, name="model")
 app.add_typer(examples_app, name="examples")
+app.add_typer(capture_app, name="capture")
 
 console = Console()
 logger = get_logger("soccer_edge.cli")
@@ -1474,3 +1477,203 @@ def evaluate() -> None:
     """Evaluate models offline."""
 
     console.print("Use: soccer-edge model evaluate --predictions <csv-or-parquet>")
+
+
+CAPTURE_SAFETY_NOTE = (
+    "RIGHTS: capture must only be used for content you own or are licensed/"
+    "compatible-license for. Capturing third-party streams (YouTube, Twitch, etc.) "
+    "is prohibited by the repo rights policy (AGENTS.md). Every capture requires an "
+    "explicit --rights-reference recorded before capture."
+)
+
+
+def _run_capture(
+    capture_source: str,
+    *,
+    duration: float | None,
+    fps: int,
+    monitor: int,
+    region: str | None,
+    device: int,
+    output: Path | None,
+    rights_status: str,
+    rights_reference: str,
+    video_id: str | None,
+    clip_type: str,
+    match_id: str,
+    competition: str,
+    season: str,
+    home_team: str,
+    away_team: str,
+    period: str,
+    notes: str,
+    manifest: Path,
+    suffix: str,
+) -> None:
+    console.print(CAPTURE_SAFETY_NOTE)
+    _require_rights(rights_status, rights_reference)
+    out = output or default_capture_output(capture_source, suffix)
+    region_dict = parse_region(region)
+    saved, row = capture_and_register(
+        capture_source,
+        out,
+        duration_seconds=duration,
+        fps=fps,
+        monitor=monitor,
+        region=region_dict,
+        device=device,
+        manifest_path=manifest,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        video_id=video_id,
+        clip_type=clip_type,
+        match_id=match_id,
+        competition=competition,
+        season=season,
+        home_team=home_team,
+        away_team=away_team,
+        period=period,
+        notes=notes,
+    )
+    console.print(f"captured={saved}")
+    console.print(f"manifest={manifest} video_id={row.video_id}")
+    console.print(
+        "next: soccer-edge train local-finetune --input "
+        f"{saved} --manifest {manifest} --video-id {row.video_id} "
+        "--object-model-path models/yolov8n.pt"
+    )
+
+
+@capture_app.command("screen")
+def capture_screen_cmd(
+    duration: float = typer.Option(10.0, help="Seconds to record."),
+    fps: int = typer.Option(20),
+    monitor: int = typer.Option(1),
+    region: str | None = typer.Option(None, help="Optional 'left,top,width,height'."),
+    output: Path | None = typer.Option(None),
+    rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
+    rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
+    video_id: str | None = typer.Option(None),
+    clip_type: str = typer.Option("training_clip"),
+    match_id: str = typer.Option(""),
+    competition: str = typer.Option(""),
+    season: str = typer.Option(""),
+    home_team: str = typer.Option(""),
+    away_team: str = typer.Option(""),
+    period: str = typer.Option(""),
+    notes: str = typer.Option(""),
+    manifest: Path = typer.Option(Path("manifests/video_manifest.csv")),
+) -> None:
+    """Capture local screen video into the pipeline (rights-gated)."""
+
+    _run_capture(
+        "screen",
+        duration=duration,
+        fps=fps,
+        monitor=monitor,
+        region=region,
+        device=0,
+        output=output,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        video_id=video_id,
+        clip_type=clip_type,
+        match_id=match_id,
+        competition=competition,
+        season=season,
+        home_team=home_team,
+        away_team=away_team,
+        period=period,
+        notes=notes,
+        manifest=manifest,
+        suffix=".mp4",
+    )
+
+
+@capture_app.command("webcam")
+def capture_webcam_cmd(
+    duration: float = typer.Option(10.0),
+    fps: int = typer.Option(20),
+    device: int = typer.Option(0),
+    output: Path | None = typer.Option(None),
+    rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
+    rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
+    video_id: str | None = typer.Option(None),
+    clip_type: str = typer.Option("training_clip"),
+    match_id: str = typer.Option(""),
+    competition: str = typer.Option(""),
+    season: str = typer.Option(""),
+    home_team: str = typer.Option(""),
+    away_team: str = typer.Option(""),
+    period: str = typer.Option(""),
+    notes: str = typer.Option(""),
+    manifest: Path = typer.Option(Path("manifests/video_manifest.csv")),
+) -> None:
+    """Capture local webcam video into the pipeline (rights-gated)."""
+
+    _run_capture(
+        "webcam",
+        duration=duration,
+        fps=fps,
+        monitor=1,
+        region=None,
+        device=device,
+        output=output,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        video_id=video_id,
+        clip_type=clip_type,
+        match_id=match_id,
+        competition=competition,
+        season=season,
+        home_team=home_team,
+        away_team=away_team,
+        period=period,
+        notes=notes,
+        manifest=manifest,
+        suffix=".mp4",
+    )
+
+
+@capture_app.command("image")
+def capture_image_cmd(
+    monitor: int = typer.Option(1),
+    region: str | None = typer.Option(None, help="Optional 'left,top,width,height'."),
+    output: Path | None = typer.Option(None),
+    rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
+    rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
+    video_id: str | None = typer.Option(None),
+    clip_type: str = typer.Option("training_clip"),
+    match_id: str = typer.Option(""),
+    competition: str = typer.Option(""),
+    season: str = typer.Option(""),
+    home_team: str = typer.Option(""),
+    away_team: str = typer.Option(""),
+    period: str = typer.Option(""),
+    notes: str = typer.Option(""),
+    manifest: Path = typer.Option(Path("manifests/video_manifest.csv")),
+) -> None:
+    """Capture a local screenshot into the pipeline (rights-gated)."""
+
+    _run_capture(
+        "image",
+        duration=None,
+        fps=20,
+        monitor=monitor,
+        region=region,
+        device=0,
+        output=output,
+        rights_status=rights_status,
+        rights_reference=rights_reference,
+        video_id=video_id,
+        clip_type=clip_type,
+        match_id=match_id,
+        competition=competition,
+        season=season,
+        home_team=home_team,
+        away_team=away_team,
+        period=period,
+        notes=notes,
+        manifest=manifest,
+        suffix=".png",
+    )
