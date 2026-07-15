@@ -57,6 +57,7 @@ from soccer_edge.models.cnn_runner import train_cnn_from_npz
 from soccer_edge.models.comparison import write_model_comparison
 from soccer_edge.models.markdown_report import write_model_markdown_report
 from soccer_edge.models.prediction_export import export_bundle_predictions
+from soccer_edge.models.promotion import promote_bundle, write_promoted_index
 from soccer_edge.models.registry import write_registry_index, write_registry_summary
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
@@ -1239,6 +1240,54 @@ def eval_to_metrics(
     """Convert an eval metrics.json into a promotion-gate predictive metrics CSV."""
 
     path = write_predictive_metrics(metrics_json, output, model_name=model_name)
+    console.print(f"wrote={path}")
+
+
+@model_app.command("promote")
+def promote(
+    bundle_dir: Path = typer.Option(..., exists=True),
+    promoted_root: Path = typer.Option(Path("models/promoted")),
+    model_card_path: Path | None = typer.Option(None, exists=False),
+    data_card_path: Path | None = typer.Option(None, exists=False),
+    dataset_versions: Path = typer.Option(..., exists=True),
+    audit_dir: Path = typer.Option(..., exists=True),
+    object_metrics: Path = typer.Option(..., exists=True),
+    predictive_metrics: Path | None = typer.Option(None, exists=False),
+    majority_baseline_rate: float = typer.Option(0.0),
+    min_accuracy_lift: float = typer.Option(0.02),
+    max_brier: float | None = typer.Option(None),
+    min_f1: float = typer.Option(0.0),
+) -> None:
+    """Promote a candidate bundle once it passes the promotion gate."""
+
+    try:
+        dest = promote_bundle(
+            bundle_dir=bundle_dir,
+            promoted_root=promoted_root,
+            model_card_path=model_card_path,
+            data_card_path=data_card_path,
+            dataset_versions_path=dataset_versions,
+            audit_dir=audit_dir,
+            object_metrics_path=object_metrics,
+            predictive_metrics_path=predictive_metrics,
+            majority_baseline_rate=majority_baseline_rate,
+            min_accuracy_lift=min_accuracy_lift,
+            max_brier=max_brier,
+            min_f1=min_f1,
+        )
+    except (RuntimeError, FileExistsError) as exc:
+        raise typer.Exit(code=1) from exc
+    console.print(f"promoted={dest}")
+
+
+@model_app.command("promoted-list")
+def promoted_list(
+    promoted_root: Path = typer.Option(Path("models/promoted")),
+    output: Path = typer.Option(Path("data/processed/promoted_models.csv")),
+) -> None:
+    """List promoted model bundles from their promotion records."""
+
+    path = write_promoted_index(promoted_root, output)
     console.print(f"wrote={path}")
 
 

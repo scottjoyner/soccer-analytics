@@ -195,6 +195,22 @@ Forward-looking:
      --majority-baseline-rate 0.50 --min-accuracy-lift 0.02 --max-brier 0.50
    ```
 
+   A passing gate promotes the bundle into `models/promoted/<name>/<version>/`
+   (copied bundle + cards + metrics + gate report + `promotion.json`):
+
+   ```bash
+   soccer-edge model promote \
+     --bundle-dir <candidate_bundle> --promoted-root models/promoted \
+     --model-card-path <model_card> --data-card-path <data_card> \
+     --dataset-versions <versions.csv> --audit-dir <audit_dir> --object-metrics <obj_metrics.csv> \
+     --predictive-metrics data/processed/predictive_metrics.csv \
+     --majority-baseline-rate 0.50 --min-accuracy-lift 0.02 --max-brier 0.50
+   soccer-edge model promoted-list --promoted-root models/promoted --output data/processed/promoted_models.csv
+   ```
+
+   `model promote` exits non-zero (and writes nothing) when the gate fails, so the
+   highlight-clip CNN cannot be promoted until a rights-clean source yields real lift.
+
 ## Quality gates
 
 Before committing new work, run:
