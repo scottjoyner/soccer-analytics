@@ -130,6 +130,10 @@ An event at exactly `t` is already known at prediction time and must not count a
 9. Train hybrid model.
 10. Calibrate output probabilities.
 11. Evaluate log loss, Brier score, calibration error, and performance by confidence bucket.
+12. Report out-of-sample metrics behind a leakage-safe hold-out (stratified match
+    split), never in-sample only. For the highlight-clip study this is scripted in
+    `scripts/evaluate_highlights.py` (tabular) and `scripts/evaluate_cnn.py` (CNN),
+    with `scripts/batch_cnn_eval.sh` sweeping seeds on a batch machine.
 
 ## Fine-tuning strategy
 

@@ -133,6 +133,9 @@ files. Processing is fully scripted and re-runnable:
 ```bash
 python scripts/process_highlights_batch.py     # transcode AV1->H.264 + detect-yolo per match
 python scripts/build_highlights_training.py    # aggregate + fine-tune both models
+python scripts/evaluate_highlights.py          # out-of-sample tabular + calibrated eval
+python scripts/evaluate_cnn.py                 # out-of-sample CNN winner eval (68/30 hold-out)
+SEEDS="0 1 2 3 4" ./scripts/batch_cnn_eval.sh <OUT_ROOT> 10   # off-box seed sweep
 ```
 
 The original clips are AV1-encoded; the local media reader has no AV1 decoder,
@@ -145,17 +148,21 @@ results were parsed from the filenames; no audiovisual content was scraped.
 | Matches processed | 98 (50 distinct teams) |
 | Detection rows | 88,127 (86,007 player / 1,541 ball) |
 | CNN grid frame-rows | 7,878 |
-| Winner accuracy (in-sample) | 48.0% (majority baseline 49.0%) |
-| Home-score regressor MSE | 0.372 (in-sample) |
-| Away-score regressor MSE | 0.204 (in-sample) |
+| Winner accuracy (in-sample fine-tune) | 48.0% (majority baseline 49.0%) |
+| Home-score regressor MSE (in-sample) | 0.372 |
+| Away-score regressor MSE (in-sample) | 0.204 |
+| Winner accuracy (out-of-sample, tabular) | 53.3% count / 50.0% track (base 49.0%) |
+| Winner accuracy (out-of-sample, CNN) | 51.6% sequence / 50.0% match (base 51.6% / 50.0%) |
 
 **Honest limitation.** Short highlight reels are highlight-selected and contain
 far fewer frames than a full match, so aggregate detection counts carry almost
-no signal about the final score. The tabular model does **not** beat the
-majority-class baseline for winner prediction. The pipeline therefore
-demonstrates end-to-end reproducibility and governance, and pinpoints where
-predictive signal must come from: full-match footage or rich open event data
-(e.g., xT, pressure). All reported figures are in-sample; no generalization is
+no signal about the final score. Both the tabular and CNN winner classifiers
+fail to beat the majority-class baseline out-of-sample (CNN: 51.6% sequence /
+50.0% match accuracy at baseline; winner Brier 0.617), confirming the
+probabilities are no better than chance. The pipeline therefore demonstrates
+end-to-end reproducibility and governance, and pinpoints where predictive signal
+must come from: full-match footage or rich open event data (e.g., xT,
+pressure). All reported figures are out-of-sample only; no generalization is
 claimed. See `paper/arxiv_draft.tex`.
 
 The shipped `highlights_training_data.zip` includes the parsed aggregates,

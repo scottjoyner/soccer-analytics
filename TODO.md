@@ -162,6 +162,9 @@
 - [x] Add model comparison report from registry summary and evaluation metrics.
 - [x] Add model comparison markdown report writer.
 - [x] Add promotion gate command that validates cards, versions, audits, and object metrics together.
+- [x] Add out-of-sample tabular highlight evaluation with calibrated winner probabilities (`scripts/evaluate_highlights.py`).
+- [x] Add out-of-sample CNN highlight evaluation with stratified 68/30 match hold-out (`scripts/evaluate_cnn.py`).
+- [x] Add crash-safe thread capping + seed-sweep batch wrapper for off-box CNN evaluation (`scripts/batch_cnn_eval.sh`).
 
 ## Phase 10 — CLI workflows
 
@@ -213,3 +216,4 @@
 3. Add raw-source manifest validation against allowed/blocked modality rules.
 4. Add graph payload file writers for player-match and player-form features.
 5. Add source-specific ingestion adapters for OpenFootball and football-data.co.uk CSVs.
+6. Add a repeated-CV variant of the out-of-sample CNN evaluation to report ± bounds.

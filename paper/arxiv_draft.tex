@@ -215,10 +215,13 @@ figures only and do not claim generalization.
 \section{Reproducibility}
 The study is scripted and re-runnable: \texttt{scripts/process\_highlights\_batch.py}
 (transcode + detect, resumable), \texttt{scripts/build\_highlights\_training.py}
-(aggregate + fine-tune), and \texttt{scripts/evaluate\_highlights.py} (out-of-sample
-+ calibrated evaluation). A data card and a zipped bundle of the processed tables
-ship with the repository, and every derived table carries lineage and
-\texttt{rights\_reference} fields.
+(aggregate + fine-tune), \texttt{scripts/evaluate\_highlights.py} (out-of-sample
+tabular + calibrated evaluation), \texttt{scripts/evaluate\_cnn.py}
+(out-of-sample CNN winner evaluation, stratified 68/30 match hold-out), and
+\texttt{scripts/batch\_cnn\_eval.sh} (seed-sweep wrapper for off-box batch
+compute). A data card and a zipped bundle of the processed tables ship with the
+repository, and every derived table carries lineage and \texttt{rights\_reference}
+fields.
 
 \section{Limitations and Ethics}
 The system intentionally cannot ingest scraped or unlicensed media; researchers

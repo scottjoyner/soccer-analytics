@@ -105,6 +105,20 @@ soccer-edge train local-finetune \
   --dry-run-plan data/processed/local_finetune/plan.sh
 ```
 
+Out-of-sample evaluation of the highlight-clip models (leakage-safe, stratified
+68/30 match hold-out; the CNN winner classifier is trained only on the train
+split):
+
+```bash
+python scripts/evaluate_highlights.py            # tabular winner + score, calibrated
+python scripts/evaluate_cnn.py                   # CNN winner, sequence + match accuracy, Brier
+SEEDS="0 1 2 3 4" ./scripts/batch_cnn_eval.sh <OUT_ROOT> 10   # seed-sweep on a batch machine
+```
+
+The CNN evaluation caps PyTorch threads (`OMP_NUM_THREADS`, default 8) to avoid
+CPU/memory oversubscription crashes; heavy sweeps should run on the batch box,
+not the interactive machine.
+
 ## Fine-tuning pipeline target
 
 The agent should prepare data for model fine-tuning in this order:
@@ -124,11 +138,22 @@ The agent should prepare data for model fine-tuning in this order:
 
 ## Suggested next implementation tasks
 
-1. Add automatic correction-review UI export for class/bbox changes.
-2. Add dry-run plan validation that checks command paths and missing inputs.
-3. Add graph export file writers for dataset/version/evaluation payload batches.
-4. Add dataset-card/model-card cross-links to graph payload IDs.
-5. Add promotion gate command that validates cards, versions, audits, and object metrics together.
+Completed in recent work:
+
+1. Add out-of-sample CNN highlight-clip winner evaluation (`scripts/evaluate_cnn.py`)
+   with a stratified 68/30 match hold-out and a seed-sweep batch wrapper
+   (`scripts/batch_cnn_eval.sh`) for off-box compute.
+2. Add leakage-safe, calibrated out-of-sample tabular evaluation
+   (`scripts/evaluate_highlights.py`).
+
+Forward-looking:
+
+1. Add a repeated-CV variant of the CNN out-of-sample eval to report ± bounds
+   like the StatsBomb results.
+2. Extend the highlight study with full-match footage or richer open event data
+   once rights-clean sources are available.
+3. Promote a model bundle through the promotion-gate command once a rights-clean
+   source yields lift over the majority-class baseline.
 
 ## Quality gates
 

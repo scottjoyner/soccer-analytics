@@ -22,7 +22,22 @@ Aggregated from permitted local footage for a research project.
   - grid_table.csv / grid_samples.npz: per-frame occupancy grids for the CNN winner model
   - model/: tabular winner classifier + home/away score regressors (predictions.csv, dataset.csv)
   - cnn_model/: CNN grid->winner bundle
+  - cnn_eval/: out-of-sample CNN winner evaluation (68/30 match hold-out) — metrics.json
+    reports sequence/match accuracy (51.6% / 50.0%, at the majority-class baseline)
+    and winner Brier (0.617); trained only on the train split
   - training_summary.md: processing + fine-tune summary
 - highlights_training_data.zip: bundle of the above, **including the fine-tuned model .joblib binaries**
+
+## Evaluation
+Out-of-sample results are scripted (leakage-safe, stratified 68/30 match hold-out):
+
+```bash
+python scripts/evaluate_highlights.py   # tabular winner + score, calibrated
+python scripts/evaluate_cnn.py          # CNN winner (sequence + match accuracy, Brier)
+```
+
+Neither the tabular nor the CNN model beats the majority-class baseline: highlight
+reels are highlight-selected and too short for aggregate detection counts to carry
+final-score signal. See `paper/arxiv_draft.tex` for the full discussion.
 
 Generated: 2026-07-14T21:08:46.550884Z
