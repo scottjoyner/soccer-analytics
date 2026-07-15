@@ -60,7 +60,7 @@ def local_finetune_shell_plan(
         f"soccer-edge video contact-sheet --source {shell_quote(crop_manifest)} --output {shell_quote(output_dir / 'crop_review.html')}",
         f"soccer-edge video export-annotations --source {shell_quote(detections_with_images)} --output-dir {shell_quote(annotations)} --classes {shell_quote(classes)}",
         f"soccer-edge video split-annotations --source {shell_quote(detections_with_images)} --train-output {shell_quote(annotations / 'train.csv')} --val-output {shell_quote(annotations / 'val.csv')} --train-fraction {train_fraction}",
-        f"soccer-edge video annotation-config --root {shell_quote(annotations)} --train-images images/train --val-images images/val --classes {shell_quote(classes)} --output {shell_quote(annotations / 'data.yaml')}",
+        f"soccer-edge video prepare-object-dataset --source {shell_quote(detections_with_images)} --output-dir {shell_quote(annotations / 'yolo')} --classes {shell_quote(classes)} --train-fraction {train_fraction}",
         f"soccer-edge model auto-data-card --dataset-name local-finetune-dataset --manifests {shell_quote(str(frame_manifest) + ',' + str(detections_with_images) + ',' + str(crop_manifest))} --output {shell_quote(output_dir / 'DATA_CARD.md')}",
     ]
     return "\n".join(commands) + "\n"

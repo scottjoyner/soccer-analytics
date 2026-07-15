@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from soccer_edge.active_sampling import write_low_confidence_rows
-from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
 from soccer_edge.annotation_split import write_annotation_split
-from soccer_edge.annotations import write_detection_annotations_from_table
+from soccer_edge.annotations import arrange_yolo_dataset_from_table, write_detection_annotations_from_table
 from soccer_edge.auto_data_card import write_auto_data_card
 from soccer_edge.contact_sheet import write_contact_sheet
 from soccer_edge.crop_export import export_image_crops_from_table
@@ -28,6 +27,7 @@ class LocalFinetuneOutputs:
     annotations_dir: Path
     train_annotations: Path
     val_annotations: Path
+    object_dataset_dir: Path
     annotation_config: Path
     data_card: Path
     object_run_dir: Path | None = None
@@ -35,6 +35,7 @@ class LocalFinetuneOutputs:
 
 def local_finetune_outputs(output_dir: Path) -> LocalFinetuneOutputs:
     annotations_dir = output_dir / "annotations"
+    object_dataset_dir = annotations_dir / "yolo"
     return LocalFinetuneOutputs(
         frame_manifest=output_dir / "frame_manifest.csv",
         detections=output_dir / "video_model" / "detections.parquet",
@@ -45,7 +46,8 @@ def local_finetune_outputs(output_dir: Path) -> LocalFinetuneOutputs:
         annotations_dir=annotations_dir,
         train_annotations=annotations_dir / "train.csv",
         val_annotations=annotations_dir / "val.csv",
-        annotation_config=annotations_dir / "data.yaml",
+        object_dataset_dir=object_dataset_dir,
+        annotation_config=object_dataset_dir / "data.yaml",
         data_card=output_dir / "DATA_CARD.md",
         object_run_dir=output_dir / "object_training" / "local_object_model",
     )
@@ -91,12 +93,14 @@ def run_local_finetune_pipeline(
     write_contact_sheet(outputs.crop_manifest, outputs.contact_sheet)
     write_detection_annotations_from_table(outputs.detections_with_images, outputs.annotations_dir, classes, image_width, image_height)
     write_annotation_split(outputs.detections_with_images, outputs.train_annotations, outputs.val_annotations, train_fraction=train_fraction)
-    write_annotation_dataset_config_from_values(
-        root=outputs.annotations_dir,
-        train_images=Path("images/train"),
-        val_images=Path("images/val"),
-        class_names=classes,
-        output_path=outputs.annotation_config,
+    arrange_yolo_dataset_from_table(
+        outputs.detections_with_images,
+        outputs.object_dataset_dir,
+        classes,
+        image_width,
+        image_height,
+        train_fraction=train_fraction,
+        image_column="image_path",
     )
     write_auto_data_card(
         dataset_name="local-finetune-dataset",

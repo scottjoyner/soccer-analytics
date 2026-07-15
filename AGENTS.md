@@ -73,8 +73,15 @@ Run calibration and annotation prep:
 soccer-edge video calibration-qa --calibration configs/pitch_calibration.json --csv-output data/processed/calibration_qa.csv --svg-output data/processed/calibration_qa.svg
 soccer-edge video calibration-summary --source data/processed/calibration_qa.csv --output data/processed/calibration_qa.md
 soccer-edge video export-annotations --source data/processed/corrected_detections.csv --output-dir data/processed/annotations --classes player,ball --image-width 1920 --image-height 1080
-soccer-edge video annotation-config --root data/processed/annotations --train-images images/train --val-images images/val --classes player,ball --output data/processed/annotations/data.yaml
+soccer-edge video prepare-object-dataset --source data/processed/corrected_detections.csv --output-dir data/processed/annotations/yolo --classes player,ball --train-fraction 0.8
 ```
+
+The `prepare-object-dataset` command builds the ultralytics-compatible YOLO layout
+(`images/{train,val}` + `labels/{train,val}` + `data.yaml`) from detection rows that carry
+an `image_path` column, so `train object-model` can consume it directly. The full
+`train local-finetune` pipeline runs this step automatically (its `annotation_config` points
+at `annotations/yolo/data.yaml`). The `annotation-config` command alone only writes a
+`data.yaml` and assumes you have already arranged the `images/`+`labels/` directories.
 
 Generate dataset metadata and evaluate object detections:
 

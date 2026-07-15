@@ -10,7 +10,7 @@ from soccer_edge.active_sampling import write_low_confidence_rows
 from soccer_edge.annotation_audit import write_annotation_audit
 from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
 from soccer_edge.annotation_split import write_annotation_split
-from soccer_edge.annotations import write_detection_annotations_from_table
+from soccer_edge.annotations import arrange_yolo_dataset_from_table, write_detection_annotations_from_table
 from soccer_edge.app_logging import configure_logging, get_logger
 from soccer_edge.auto_data_card import write_auto_data_card
 from soccer_edge.calibration_qa import write_projection_qa_csv, write_projection_qa_svg
@@ -482,6 +482,35 @@ def annotation_config(
     class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
     path = write_annotation_dataset_config_from_values(root, train_images, val_images, class_names, output, test_images=test_images)
     console.print(f"wrote={path}")
+
+
+@video_app.command("prepare-object-dataset")
+def prepare_object_dataset(
+    source: Path = typer.Option(..., exists=True),
+    output_dir: Path = typer.Option(Path("data/processed/object_dataset")),
+    classes: str = typer.Option("player,ball"),
+    image_width: float = typer.Option(1920.0),
+    image_height: float = typer.Option(1080.0),
+    train_fraction: float = typer.Option(0.8),
+    group_column: str = typer.Option("frame_idx"),
+    image_column: str = typer.Option("image_path"),
+    link_images: bool = typer.Option(True),
+) -> None:
+    """Build a YOLO dataset (images/labels train+val + data.yaml) for object training."""
+
+    class_names = [class_name.strip() for class_name in classes.split(",") if class_name.strip()]
+    paths = arrange_yolo_dataset_from_table(
+        source,
+        output_dir,
+        class_names,
+        image_width,
+        image_height,
+        train_fraction=train_fraction,
+        group_column=group_column,
+        image_column=image_column,
+        link_images=link_images,
+    )
+    console.print({name: str(path) for name, path in paths.items()})
 
 
 @video_app.command("sample-low-confidence")
