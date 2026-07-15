@@ -213,9 +213,9 @@ supervision---precisely the signal source the highlight-clip features lack.
 count nor the track detection features outperform the majority-class baseline
 for winner prediction, and the calibrated Brier scores ($\approx0.61$) confirm
 the probabilities are no better than chance. The out-of-sample CNN evaluation
-agrees: over a 5-seed $\times$ 10-epoch sweep it reaches
-$50.6\%\ (\pm0.8)$ sequence accuracy and $50.0\%$ match accuracy---both at the
-majority-class baseline---with a winner Brier of $0.624\ (\pm0.005)$. These
+agrees: over a 5-fold repeated-CV sweep (10 epochs) it reaches
+$49.3\%\ (\pm1.8)$ sequence accuracy and $48.9\%\ (\pm1.3)$ match accuracy---both
+at the majority-class baseline---with a winner Brier of $0.630\ (\pm0.011)$. These
 figures are produced by the repeated-CV variant of the evaluation
 (\texttt{--folds}/\texttt{--repeats}), which reports mean$\pm$sd across a
 stratified match hold-out; the deep model therefore reproduces the same null
