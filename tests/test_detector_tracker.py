@@ -32,3 +32,20 @@ def test_frame_local_tracker_assigns_ids() -> None:
     states = tracker.update(detections)
     assert states[0].track_id == "7:0"
     assert states[0].class_name == "player"
+
+
+def test_detections_from_rows_boundary_and_defaults() -> None:
+    # Exactly-at-threshold is kept (strict less-than skips only below threshold).
+    rows = [
+        {"class_name": "player", "confidence": 0.25, "x1": 1, "y1": 2, "x2": 3, "y2": 4},
+        {"confidence": 0.24},  # below threshold -> dropped
+    ]
+    detections = detections_from_rows(rows, frame_idx=0, confidence_threshold=0.25)
+    assert len(detections) == 1
+    kept = detections[0]
+    assert kept.class_name == "player"
+    # Missing keys fall back to safe defaults.
+    assert kept.confidence == 0.25
+    assert (kept.x1, kept.y1, kept.x2, kept.y2) == (1.0, 2.0, 3.0, 4.0)
+    low = detections_from_rows([{"confidence": 0.24}], frame_idx=0, confidence_threshold=0.25)
+    assert low == []
