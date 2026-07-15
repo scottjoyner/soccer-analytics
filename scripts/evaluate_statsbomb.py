@@ -27,12 +27,28 @@ CANDIDATE_DIRS = [
 OUT = Path("data/processed/event_eval")
 OUT.mkdir(parents=True, exist_ok=True)
 
+# Basic feature set (no xT / pressure regains) for ablation.
+BASIC_FEATURES = [
+    col
+    for col in default_event_features()
+    if not col.endswith("_xt") and not col.endswith("_pressure_regains")
+]
+
 
 def _find_source() -> Path | None:
     for p in CANDIDATE_DIRS:
         if (p / "competitions.json").exists() and list(p.glob("events/*.json")):
             return p
     return None
+
+
+def _report(label: str, m: dict) -> None:
+    print(f"\n=== {label} (5-fold x10 repeats, n={m['n_matches']}) ===")
+    print(f"  winner accuracy : {m['winner_accuracy_mean']:.3f} +/- {m['winner_accuracy_std']:.3f}")
+    print(f"  majority baseline: {m['majority_baseline_accuracy_mean']:.3f} +/- {m['majority_baseline_accuracy_std']:.3f}")
+    print(f"  winner Brier     : {m['winner_brier_mean']:.3f} +/- {m['winner_brier_std']:.3f}")
+    print(f"  home score MSE   : {m['home_score_mse_mean']:.3f} +/- {m['home_score_mse_std']:.3f}")
+    print(f"  away score MSE   : {m['away_score_mse_mean']:.3f} +/- {m['away_score_mse_std']:.3f}")
 
 
 def main() -> int:
@@ -43,19 +59,18 @@ def main() -> int:
 
     print(f"source: {source}")
     frame = build_match_event_features(source)
-    features = default_event_features()
     frame.to_csv(OUT / "event_features.csv", index=False)
-    print(f"matches: {len(frame)}  features: {len(features)}")
 
-    metrics = repeated_cv_match_predictor(frame, features, n_splits=5, n_repeats=10)
+    richer = default_event_features()
+    print(f"matches: {len(frame)}  basic features: {len(BASIC_FEATURES)}  richer: {len(richer)}")
+
+    basic_metrics = repeated_cv_match_predictor(frame, BASIC_FEATURES, n_splits=5, n_repeats=10)
+    richer_metrics = repeated_cv_match_predictor(frame, richer, n_splits=5, n_repeats=10)
+    metrics = {"basic": basic_metrics, "richer": richer_metrics}
     (OUT / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
-    print("\n=== StatsBomb event-feature model (5-fold x10 repeats) ===")
-    print(f"  winner accuracy : {metrics['winner_accuracy_mean']:.3f} +/- {metrics['winner_accuracy_std']:.3f}")
-    print(f"  majority baseline: {metrics['majority_baseline_accuracy_mean']:.3f} +/- {metrics['majority_baseline_accuracy_std']:.3f}")
-    print(f"  winner Brier     : {metrics['winner_brier_mean']:.3f} +/- {metrics['winner_brier_std']:.3f}")
-    print(f"  home score MSE   : {metrics['home_score_mse_mean']:.3f} +/- {metrics['home_score_mse_std']:.3f}")
-    print(f"  away score MSE   : {metrics['away_score_mse_mean']:.3f} +/- {metrics['away_score_mse_std']:.3f}")
+    _report("StatsBomb basic event features (xG + counts)", basic_metrics)
+    _report("StatsBomb richer event features (+xT, pressure regains)", richer_metrics)
     print(f"wrote {OUT / 'metrics.json'}")
     return 0
 

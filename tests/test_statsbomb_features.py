@@ -38,13 +38,18 @@ def _fixture(root: Path) -> None:
     ]
     _write_json(root / "matches" / "2" / "27.json", matches)
     events_1 = [
-        {"team": {"name": "Home FC"}, "type": {"name": "Shot"}, "shot": {"statsbomb_xg": 0.4, "outcome": {"name": "Goal"}}},
-        {"team": {"name": "Home FC"}, "type": {"name": "Pass"}},
-        {"team": {"name": "Away FC"}, "type": {"name": "Pressure"}},
+        {"team": {"name": "Home FC"}, "type": {"name": "Pass"}, "location": [60, 40], "pass": {"end_location": [70, 40]}},
+        {"team": {"name": "Home FC"}, "type": {"name": "Pressure"}, "location": [50, 40]},
+        {"team": {"name": "Home FC"}, "type": {"name": "Ball Recovery"}, "location": [52, 41]},
+        {"team": {"name": "Away FC"}, "type": {"name": "Pressure"}, "location": [30, 30]},
+        {"team": {"name": "Home FC"}, "type": {"name": "Shot"}, "location": [110, 40],
+         "shot": {"statsbomb_xg": 0.4, "outcome": {"name": "Goal"}, "end_location": [120, 40]}},
     ]
     events_2 = [
-        {"team": {"name": "Home FC"}, "type": {"name": "Shot"}, "shot": {"statsbomb_xg": 0.1, "outcome": {"name": "Saved"}}},
-        {"team": {"name": "Away FC"}, "type": {"name": "Carry"}},
+        {"team": {"name": "Home FC"}, "type": {"name": "Shot"}, "location": [108, 40],
+         "shot": {"statsbomb_xg": 0.1, "outcome": {"name": "Saved"}, "end_location": [120, 40]}},
+        {"team": {"name": "Away FC"}, "type": {"name": "Carry"}, "location": [40, 30], "carry": {"end_location": [45, 30]}},
+        {"team": {"name": "Away FC"}, "type": {"name": "Pressure"}, "location": [45, 30]},
     ]
     _write_json(root / "events" / "1.json", events_1)
     _write_json(root / "events" / "2.json", events_2)
@@ -62,6 +67,10 @@ def test_build_match_event_features(tmp_path: Path) -> None:
     assert row1["home_n_shot"] == 1
     assert row1["home_n_pass"] == 1
     assert row1["away_n_pressure"] == 1
+    # xT and pressure regains are produced and the press was regained once.
+    assert "home_xt" in frame.columns and "home_pressure_regains" in frame.columns
+    assert row1["home_pressure_regains"] == 1
+    assert row1["home_xt"] > 0.0
 
     row2 = frame[frame["match_id"] == "2"].iloc[0]
     assert row2["winner"] == 1
@@ -75,7 +84,10 @@ def test_build_match_event_features_filters_competition(tmp_path: Path) -> None:
     assert len(frame) == 0
 
 
-def test_default_event_features_unique() -> None:
+def test_default_event_features_includes_xt_and_pressure(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    build_match_event_features(tmp_path)  # ensure module imports/works
     cols = default_event_features()
     assert len(cols) == len(set(cols))
     assert "home_xg" in cols and "away_xg" in cols
+    assert "home_xt" in cols and "away_pressure_regains" in cols

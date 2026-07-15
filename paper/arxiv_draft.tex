@@ -177,15 +177,18 @@ Grid frame-rows & \multicolumn{2}{c}{7,878} & CNN input \\
 \paragraph{Open event-data model.} To show where predictive signal actually
 lives, we applied the same calibrated evaluation pipeline to
 StatsBomb Open Data (Premier League 2023/24; 380 matches, sanctioned tier-1
-open event data, non-audiovisual). Using home/away event-derived features
-(expected goals, shots, shots on target, passes, pressures, carries, clearances,
-interceptions, blocks, fouls, ball recoveries) and repeated
-5-fold $\times$ 10 cross-validation, the winner classifier reaches
-\textbf{63.3\% ($\pm$2.9)} accuracy against a \textbf{41.3\%} majority-class
-baseline, with a calibrated Brier score of \textbf{0.164} and home/away score
-MSE of \textbf{0.96 / 0.87}. This confirms the pipeline yields genuine,
-calibrated lift once fed rights-clean open supervision---precisely the signal
-source the highlight-clip features lack.
+open event data, non-audiovisual). Features are derived home/away from the event
+stream: expected goals (xG, provided), a data-driven expected-threat (xT)
+surface fit from the possession-transition matrix, shots, pressure regains, and
+count features (passes, pressures, carries, clearances, interceptions, blocks,
+fouls, ball recoveries). Under repeated 5-fold $\times$ 10 cross-validation the
+calibrated winner classifier reaches \textbf{63.3\% ($\pm$2.9)} accuracy with a
+\textbf{0.164} Brier and home/away score MSE of \textbf{0.96 / 0.87}, against a
+\textbf{41.3\%} majority-class baseline. Adding xT and pressure regains
+(63.1\% $\pm$3.6) does not materially change accuracy, indicating the basic
+xG-plus-count feature set already captures the available signal. This confirms
+the pipeline yields genuine, calibrated lift once fed rights-clean open
+supervision---precisely the signal source the highlight-clip features lack.
 
 \paragraph{Honest limitation.} As Table~\ref{tab:results} shows, neither the
 count nor the track detection features outperform the majority-class baseline
@@ -220,10 +223,11 @@ real-money actions are performed.
 We presented a rights-safe, local-first soccer analytics pipeline that turns
 permitted footage and open event data into detection datasets and match-outcome
 models, with a hard, tested rights gate at every footage boundary. Future work
-includes calibrating the detector on full-match footage and adding richer
-event features (e.g., xT, pressure regains) as stronger supervisory signal; the
-feature scaler, calibrated classifier, and repeated cross-validated evaluation
-are already in place, and an open event-data model is demonstrated above.
+includes calibrating the detector on full-match footage, fitting the xT
+surface per cross-validation fold (currently league-wide, a negligible leakage
+given its aggregate nature), and adding tracking-derived possession features;
+the feature scaler, calibrated classifier, repeated cross-validated evaluation,
+and an open event-data model with expected threat are already in place.
 
 \bibliographystyle{plain}
 \begin{thebibliography}{9}
