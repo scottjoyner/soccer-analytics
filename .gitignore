@@ -22,6 +22,9 @@ data/models/**
 data/predictions/**
 !data/**/.gitkeep
 
+# Ultralytics default training output (train object-model)
+runs/
+
 # Media
 *.mp4
 *.mov
