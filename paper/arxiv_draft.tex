@@ -130,7 +130,11 @@ supervisory labels (winner, home/away score) for the outcome models.
 \section{Match-Outcome Models}
 \paragraph{Tabular model.} \texttt{train\_match\_predictor} fits a multinomial
 logistic-regression winner classifier and two RandomForest regressors for the
-home and away scores, using the five detection-derived features above.
+home and away scores, using the five detection-derived features above. To avoid
+optimistic in-sample estimates we evaluate behind a leakage-safe stratified
+train/test split (68/30), a \texttt{StandardScaler}, and a
+\texttt{CalibratedClassifierCV} wrapper so the winner probabilities are
+calibrated and the Brier score is meaningful.
 \paragraph{Convolutional model.} \texttt{train\_match\_predictor\_cnn} builds an
 NPZ of occupancy-grid tensors (grouped by match, with a sliding window of
 sequence length 4) and trains a small CNN winner classifier (PyTorch).
@@ -140,40 +144,54 @@ Over the 98 permitted clips the batch produced \textbf{88,127} detection rows
 (86,007 player detections, 1,541 ball detections) across 7,878 grid frame-rows.
 The tabular model was trained on the resulting 98-match dataset.
 
+We compare two feature sets: (i) the five \emph{count} features used above
+(\texttt{n\_player}, \texttt{n\_ball}, \texttt{avg\_det\_per\_frame},
+\texttt{ball\_center\_x/y}), and (ii) nine \emph{track} features that attempt to
+capture possession and pressure from the per-frame boxes---ball frame-rate,
+person frame-rate, mean nearest player--ball distance, mean players-near-ball,
+contested-ball rate, ball movement, and mean player-box area. Both are evaluated
+behind the same stratified 68/30 split with a calibrated winner classifier.
+
 \begin{table}[h]
 \centering
-\caption{In-sample results on the 98-match highlight dataset.
-Accuracy is reported against the majority-class baseline to expose the
-limited predictive content of highlight-clip detection aggregates.}
+\caption{Out-of-sample results on the 98-match highlight dataset (30-match held-out
+test, calibrated classifier). Accuracy is reported against the majority-class
+baseline (49\%); a Brier score near 0.5--0.7 indicates near-random probability
+quality.}
 \label{tab:results}
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-Model / metric & Value & Note \\
+Feature set / metric & Count & Track & Note \\
 \midrule
-Winner accuracy (in-sample) & 48.0\% & majority baseline 49.0\% \\
-Home-score regressor MSE & 0.372 & in-sample \\
-Away-score regressor MSE & 0.204 & in-sample \\
-Detection rows & 88,127 & 86,007 player / 1,541 ball \\
-Grid frame-rows & 7,878 & CNN input \\
+Winner accuracy (test) & 53.3\% & 50.0\% & baseline 49.0\% \\
+Winner Brier (test) & 0.623 & 0.614 & lower is better \\
+Home-score MSE (test) & 1.770 & 1.864 & out-of-sample \\
+Away-score MSE (test) & 2.345 & 2.066 & out-of-sample \\
+Train rows / test rows & \multicolumn{2}{c}{68 / 30} & stratified \\
+Detection rows & \multicolumn{2}{c}{88,127} & 86,007 player / 1,541 ball \\
+Grid frame-rows & \multicolumn{2}{c}{7,878} & CNN input \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Honest limitation.} As Table~\ref{tab:results} shows, the highlight
-detection features do \emph{not} outperform the majority-class baseline for
-winner prediction. This is the expected and, we argue, informative result:
-short highlight reels are highlight-selected (not representative of open
-play), contain far fewer frames than a full match, and aggregate detection
-counts are nearly invariant to final score. The pipeline therefore demonstrates
-end-to-end reproducibility and governance, while clearly delineating where
-predictive signal must come from: full-match footage or rich open event data
-(Section~\ref{sec:data}). We report in-sample figures only and do not claim
+\paragraph{Honest limitation.} As Table~\ref{tab:results} shows, neither the
+count nor the track detection features outperform the majority-class baseline
+for winner prediction, and the calibrated Brier scores ($\approx0.61$) confirm
+the probabilities are no better than chance. This is the expected and, we argue,
+informative result: short highlight reels are highlight-selected (not
+representative of open play), contain far fewer frames than a full match, and
+aggregate detection counts are nearly invariant to final score. The pipeline
+therefore demonstrates end-to-end reproducibility and governance---including a
+leakage-safe, calibrated evaluation---while clearly delineating where predictive
+signal must come from: full-match footage or rich open event data
+(Section~\ref{sec:data}). We report out-of-sample figures only and do not claim
 generalization.
 
 \section{Reproducibility}
 The study is scripted and re-runnable: \texttt{scripts/process\_highlights\_batch.py}
-(transcode + detect, resumable) and \texttt{scripts/build\_highlights\_training.py}
-(aggregate + fine-tune). A data card and a zipped bundle of the processed tables
+(transcode + detect, resumable), \texttt{scripts/build\_highlights\_training.py}
+(aggregate + fine-tune), and \texttt{scripts/evaluate\_highlights.py} (out-of-sample
++ calibrated evaluation). A data card and a zipped bundle of the processed tables
 ship with the repository, and every derived table carries lineage and
 \texttt{rights\_reference} fields.
 
@@ -188,9 +206,9 @@ real-money actions are performed.
 We presented a rights-safe, local-first soccer analytics pipeline that turns
 permitted footage and open event data into detection datasets and match-outcome
 models, with a hard, tested rights gate at every footage boundary. Future work
-includes calibrating the detector on full-match footage, adding a feature
-scaler for the classifier, and incorporating open event features (e.g.,
-xT, pressure) as stronger supervisory signal.
+includes calibrating the detector on full-match footage and incorporating open
+event features (e.g., xT, pressure) as stronger supervisory signal; the feature
+scaler and calibrated classifier are already in place.
 
 \bibliographystyle{plain}
 \begin{thebibliography}{9}

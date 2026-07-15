@@ -39,3 +39,5 @@ data/predictions/**
 # Downloaded model weights
 *.pt
 *.ptc
+# Never commit the YouTube/Audiovisual downloader (violates repo rights rules)
+download_highlights.sh
