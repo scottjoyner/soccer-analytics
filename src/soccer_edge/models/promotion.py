@@ -61,6 +61,25 @@ def promote_bundle(
     """
 
     bundle_dir = Path(bundle_dir)
+    if not bundle_dir.exists():
+        raise FileNotFoundError(f"bundle_dir does not exist: {bundle_dir}")
+    if not (bundle_dir / "metadata.json").exists():
+        raise FileNotFoundError(f"bundle metadata.json missing: {bundle_dir / 'metadata.json'}")
+    for label, path in (
+        ("dataset_versions_path", dataset_versions_path),
+        ("audit_dir", audit_dir),
+        ("object_metrics_path", object_metrics_path),
+    ):
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"{label} does not exist: {p}")
+    if model_card_path is not None and not Path(model_card_path).exists():
+        raise FileNotFoundError(f"model_card_path does not exist: {model_card_path}")
+    if data_card_path is not None and not Path(data_card_path).exists():
+        raise FileNotFoundError(f"data_card_path does not exist: {data_card_path}")
+    if predictive_metrics_path is not None and not Path(predictive_metrics_path).exists():
+        raise FileNotFoundError(f"predictive_metrics_path does not exist: {predictive_metrics_path}")
+
     metadata = read_run_metadata(bundle_dir / "metadata.json")
     result = run_promotion_gate(
         model_card_path,

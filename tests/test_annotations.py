@@ -43,11 +43,12 @@ def test_arrange_yolo_dataset(tmp_path) -> None:
     paths = arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, train_fraction=0.6)
     for name in ("images_train", "images_val", "labels_train", "labels_val", "classes", "config"):
         assert paths[name].exists(), name
-    # Frame groups are not split: frames 1-2 train, frame 3 val (sorted, 60% of 3 -> 2 train).
-    assert (tmp_path / "yolo" / "images" / "train" / "1.jpg").is_symlink()
-    assert (tmp_path / "yolo" / "images" / "train" / "2.jpg").exists()
-    assert (tmp_path / "yolo" / "images" / "val" / "3.jpg").exists()
-    assert len((tmp_path / "yolo" / "labels" / "train" / "1.txt").read_text(encoding="utf-8").strip().splitlines()) == 2
+    # Groups are keyed by image when images are present: frame_1/frame_2 train, frame_3 val
+    # (sorted, 60% of 3 -> 2 train). A frame's boxes stay together under one image name.
+    assert (tmp_path / "yolo" / "images" / "train" / "frame_1.jpg").is_symlink()
+    assert (tmp_path / "yolo" / "images" / "train" / "frame_2.jpg").exists()
+    assert (tmp_path / "yolo" / "images" / "val" / "frame_3.jpg").exists()
+    assert len((tmp_path / "yolo" / "labels" / "train" / "frame_1.txt").read_text(encoding="utf-8").strip().splitlines()) == 2
     yaml_text = paths["config"].read_text(encoding="utf-8")
     assert "train: images/train" in yaml_text
     assert "val: images/val" in yaml_text
@@ -63,3 +64,24 @@ def test_arrange_yolo_dataset_missing_images_skips_links(tmp_path) -> None:
     assert paths["labels_train"].joinpath("1.txt").exists()
     assert not list((tmp_path / "yolo" / "images" / "train").glob("*.jpg"))
     assert paths["classes"].exists()
+
+
+def test_arrange_yolo_dataset_no_image_leakage(tmp_path) -> None:
+    shared = tmp_path / "shared.jpg"
+    other = tmp_path / "other.jpg"
+    shared.write_bytes(b"img-a")
+    other.write_bytes(b"img-b")
+    # Two frame groups reference the SAME physical image; it must land in exactly one split.
+    detections = pd.DataFrame(
+        [
+            {"frame_idx": 1, "class_name": "player", "x1": 0, "y1": 0, "x2": 20, "y2": 10, "image_path": str(shared)},
+            {"frame_idx": 2, "class_name": "ball", "x1": 5, "y1": 5, "x2": 15, "y2": 15, "image_path": str(shared)},
+            {"frame_idx": 3, "class_name": "player", "x1": 2, "y1": 2, "x2": 12, "y2": 8, "image_path": str(other)},
+        ]
+    )
+    arrange_yolo_dataset(detections, tmp_path / "yolo", ["player", "ball"], 100, 50, train_fraction=0.5)
+    train_links = list((tmp_path / "yolo" / "images" / "train").glob("*.jpg"))
+    val_links = list((tmp_path / "yolo" / "images" / "val").glob("*.jpg"))
+    all_links = [p.name for p in train_links + val_links]
+    assert all_links.count("shared.jpg") == 1, all_links
+    assert len(train_links + val_links) == 2

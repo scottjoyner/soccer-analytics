@@ -91,22 +91,31 @@ class _FakeWriter:
         self.path = path
         self.size = size
         self.calls = 0
+        self.released = False
         Path(path).write_bytes(b"")
 
     def write(self, frame) -> None:
         self.calls += 1
 
     def release(self) -> None:
-        pass
+        self.released = True
 
 
 def test_capture_webcam_video_writes_frames(tmp_path, monkeypatch) -> None:
+    writers = []
+
+    def _make_writer(path, fourcc, fps, size):
+        w = _FakeWriter(path, fourcc, fps, size)
+        writers.append(w)
+        return w
+
     monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
-    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    monkeypatch.setattr(cv2, "VideoWriter", _make_writer)
     out = tmp_path / "cap.mp4"
     saved = capture_webcam_video(out, duration_seconds=0.5, fps=10)
     assert saved.exists()
-    assert saved.stat().st_size >= 0
+    assert writers[0].calls > 0
+    assert writers[0].released
 
 
 class _FakeShot:
@@ -313,7 +322,8 @@ def test_capture_and_detect_zero_frames_no_video(tmp_path, monkeypatch) -> None:
         detections_output=det,
     )
     assert result["video"] is None
-    assert det.exists()
+    assert result["detections"] is None
+    assert not det.exists()
 
 
 def test_capture_and_detect_and_register_zero_frames_no_manifest(tmp_path, monkeypatch) -> None:

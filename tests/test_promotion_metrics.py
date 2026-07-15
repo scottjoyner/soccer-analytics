@@ -59,7 +59,7 @@ def test_write_predictive_metrics(tmp_path) -> None:
 def test_write_classification_predictive_metrics(tmp_path) -> None:
     from soccer_edge.models.metrics import ClassificationMetrics
 
-    metrics = ClassificationMetrics(log_loss=0.7, brier_score=0.31, accuracy=0.62)
+    metrics = ClassificationMetrics(log_loss=0.7, brier_score=0.31, accuracy=0.62, majority_baseline_accuracy=0.55)
     out = tmp_path / "pred.csv"
     path = write_classification_predictive_metrics(metrics, out, model_name="tabular-v1")
     assert path.exists()
@@ -67,4 +67,5 @@ def test_write_classification_predictive_metrics(tmp_path) -> None:
     assert frame.iloc[0]["model"] == "tabular-v1"
     assert frame.iloc[0]["accuracy"] == 0.62
     assert frame.iloc[0]["brier"] == 0.31
+    assert frame.iloc[0]["baseline_accuracy"] == 0.55
 

@@ -56,7 +56,10 @@ def resolve_baseline_rate(frame: pd.DataFrame, majority_baseline_rate: float | N
         valid = frame["baseline_accuracy"].dropna()
         if not valid.empty:
             return float(valid.mean()), None
-    return 0.0, "no majority-baseline-rate given and no baseline_accuracy column; using 0.0"
+    raise ValueError(
+        "no majority-baseline-rate given and predictive metrics have no baseline_accuracy; "
+        "cannot verify lift over the majority baseline"
+    )
 
 
 def beats_majority_baseline(

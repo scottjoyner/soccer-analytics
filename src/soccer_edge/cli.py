@@ -1292,7 +1292,7 @@ def promote(
             max_brier=max_brier,
             min_f1=min_f1,
         )
-    except (RuntimeError, FileExistsError) as exc:
+    except (RuntimeError, FileExistsError, FileNotFoundError, ValueError) as exc:
         raise typer.Exit(code=1) from exc
     console.print(f"promoted={dest}")
 

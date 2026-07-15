@@ -18,8 +18,6 @@ import datetime
 import time
 from pathlib import Path
 
-import cv2
-
 from soccer_edge.video.manifest import PROCESSABLE_RIGHTS_STATUSES, VideoManifestRow
 
 CAPTURE_SCHEME = "capture"
@@ -136,6 +134,10 @@ def _iter_frames(
     device: int = 0,
     mss_module=None,
 ):
+    import cv2
+
+    if duration_seconds <= 0:
+        raise ValueError(f"duration_seconds must be positive, got {duration_seconds}")
     start = time.time()
     if capture_source == "webcam":
         cap = cv2.VideoCapture(device)
@@ -162,6 +164,8 @@ def _iter_frames(
 
 
 def _open_video_writer(output: Path, fps: int, sample_frame, codec: str = "mp4v"):
+    import cv2
+
     height, width = sample_frame.shape[:2]
     return cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
 
@@ -178,6 +182,7 @@ def capture_screen_image(output: Path, monitor: int = 1, region: dict | None = N
 
 
 def _mss_to_bgr(shot) -> object:
+    import cv2
     import numpy as np
 
     height = int(getattr(shot, "height", getattr(shot, "size", (0, 0))[1]))
@@ -200,6 +205,8 @@ def _write_detections_csv(detections: list[dict], output: Path) -> Path:
 
 
 def _draw_boxes(frame, rows: list[dict]):
+    import cv2
+
     annotated = frame.copy()
     for row in rows:
         x1, y1, x2, y2 = int(row["x1"]), int(row["y1"]), int(row["x2"]), int(row["y2"])
@@ -277,6 +284,8 @@ def capture_and_detect(
     finally:
         if writer is not None:
             writer.release()
+    if frames_written == 0:
+        return {"video": None, "detections": None}
     detections_path = _write_detections_csv(detections, detections_output)
     saved_video = Path(output_video) if (output_video is not None and frames_written > 0) else None
     return {"video": saved_video, "detections": detections_path}
@@ -314,6 +323,8 @@ def capture_and_detect_and_register(
 ) -> tuple[Path, Path, VideoManifestRow]:
     if capture_source == "image":
         raise ValueError("live detection requires a video source (screen/webcam), not image")
+    if capture_source == "screen" and duration_seconds is None:
+        raise ValueError("duration_seconds is required for live screen detection capture")
     result = capture_and_detect(
         capture_source,
         model_path=model_path,

@@ -39,15 +39,19 @@ def _candidate_row(metrics: dict) -> dict | None:
 def read_predictive_table(metrics_json_path: Path) -> pd.DataFrame:
     data = json.loads(Path(metrics_json_path).read_text(encoding="utf-8"))
     rows: list[dict] = []
-    if isinstance(data, dict) and data and all(isinstance(value, dict) for value in data.values()):
-        for model_name, sub in data.items():
-            row = _candidate_row(sub)
-            if row is not None:
-                rows.append({"model": model_name, **row, "split": "test"})
-    else:
-        row = _candidate_row(data)
-        if row is not None:
-            rows.append({"model": "model", **row, "split": "test"})
+    if isinstance(data, dict) and "_candidate_keys" not in data:
+        flat = _candidate_row(data)
+        if flat is not None:
+            rows.append({"model": "model", **flat, "split": "test"})
+        else:
+            # Treat each top-level entry as a candidate sub-model. A flat dict with
+            # extra scalar keys must not be silently misread as a single flat row.
+            for model_name, sub in data.items():
+                if not isinstance(sub, dict):
+                    continue
+                row = _candidate_row(sub)
+                if row is not None:
+                    rows.append({"model": str(model_name), **row, "split": "test"})
     if not rows:
         raise ValueError(f"no accuracy/brier fields found in {metrics_json_path}")
     return pd.DataFrame(rows, columns=["model", "accuracy", "brier", "baseline_accuracy", "split"])
@@ -72,7 +76,7 @@ def write_classification_predictive_metrics(metrics, output_path: Path, model_na
                 "model": model_name,
                 "accuracy": float(metrics.accuracy),
                 "brier": float(metrics.brier_score),
-                "baseline_accuracy": None,
+                "baseline_accuracy": float(metrics.majority_baseline_accuracy),
                 "split": split,
             }
         ]

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import shutil
+import warnings
 
 from soccer_edge.annotation_dataset import write_annotation_dataset_config_from_values
 
@@ -93,6 +94,9 @@ def arrange_yolo_dataset(
         directory.mkdir(parents=True, exist_ok=True)
 
     known = detections[detections[class_column].isin(classes)]
+    dropped = len(detections) - len(known)
+    if dropped:
+        warnings.warn(f"{dropped} detection rows dropped: class_name not in {classes}")
     if known.empty:
         raise ValueError("no detections matched the provided classes")
     groups = sorted(known[group_column].dropna().unique().tolist())
@@ -104,11 +108,30 @@ def arrange_yolo_dataset(
     train_groups = set(groups[:n_train])
 
     has_images = image_column in known.columns
-    for frame_id, group in known.groupby(group_column):
-        split = "train" if frame_id in train_groups else "val"
+    if has_images:
+        # Group by the physical image so a single image is never split across
+        # train/val (frame groups may share an image_path otherwise).
+        group_key = image_column
+    else:
+        group_key = group_column
+    groups = sorted(known[group_key].dropna().unique().tolist())
+    if not groups:
+        raise ValueError(f"no non-null values in group column {group_key!r}")
+    n_train = max(1, int(round(len(groups) * train_fraction)))
+    if len(groups) > 1:
+        n_train = min(n_train, len(groups) - 1)
+    train_groups = set(groups[:n_train])
+
+    for group_value, group in known.groupby(group_key):
+        if has_images:
+            image_src = group.iloc[0][image_column]
+            name = Path(str(image_src)).stem
+        else:
+            name = str(group_value)
+        split = "train" if group_value in train_groups else "val"
         label_dir = labels_train if split == "train" else labels_val
         image_dir = images_train if split == "train" else images_val
-        label_path = label_dir / f"{frame_id}.txt"
+        label_path = label_dir / f"{name}.txt"
         lines = [
             normalized_box_line(row, class_to_id, image_width, image_height, class_column)
             for _, row in group.iterrows()
@@ -120,7 +143,7 @@ def arrange_yolo_dataset(
             if pd.notna(image_src) and str(image_src):
                 src = Path(str(image_src))
                 if src.exists():
-                    dst = image_dir / f"{frame_id}{src.suffix}"
+                    dst = image_dir / f"{name}{src.suffix}"
                     if link_images:
                         if not dst.exists():
                             dst.symlink_to(src.resolve())
