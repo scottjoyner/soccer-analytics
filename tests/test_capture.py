@@ -222,6 +222,9 @@ class _FakeRunner:
         self.calls += 1
         return [{"class_name": "person", "confidence": 0.9, "x1": 10.0, "y1": 10.0, "x2": 50.0, "y2": 50.0}]
 
+    def detect_frame(self, frame_idx, frame):
+        return self(frame)
+
 
 def test_capture_and_detect_writes_detections(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
@@ -314,6 +317,128 @@ def test_capture_and_register_zero_frames_no_manifest(tmp_path, monkeypatch) -> 
             rights_reference="ref1",
         )
     assert not manifest.exists()
+
+
+def test_capture_and_detect_writes_realtime_state(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    det = tmp_path / "det.csv"
+    state_out = tmp_path / "state"
+    result = capture_and_detect(
+        "webcam",
+        runner=_FakeRunner(),
+        duration_seconds=0.2,
+        fps=10,
+        output_video=tmp_path / "cap.mp4",
+        detections_output=det,
+        state_output=state_out,
+        video_id="v1",
+    )
+    assert result["video"] == tmp_path / "cap.mp4"
+    assert det.exists()
+    assert result["state"] == state_out
+    # Realtime state tables + low-confidence review queue were written.
+    assert (state_out / "detections.parquet").exists()
+    assert (state_out / "tracks.parquet").exists()
+    assert (state_out / "review_queue.parquet").exists()
+
+
+def test_live_watch_runs_realtime_pipeline(tmp_path, monkeypatch) -> None:
+    import soccer_edge.media_samples as media_samples_module
+    import soccer_edge.video.detector as detector_module
+    import soccer_edge.realtime as realtime_module
+
+    from soccer_edge.video.detector import Detection
+
+    class _FakeDet:
+        def __init__(self, model_path, confidence_threshold=0.25):
+            self.i = 0
+
+        def detect_frame(self, frame_idx, frame):
+            self.i += 1
+            x = 100.0 + (self.i * 200)
+            return [
+                Detection(frame_idx=frame_idx, class_name="player", confidence=0.9, x1=x, y1=500.0, x2=x + 40, y2=540.0),
+                Detection(frame_idx=frame_idx, class_name="ball", confidence=0.85, x1=x, y1=500.0, x2=x + 10, y2=510.0),
+            ]
+
+    class _FakeMedia:
+        def __init__(self, path, *, stride=1, max_samples=None):
+            self._n = 3
+
+        def __iter__(self):
+            for i in range(self._n):
+                yield type("S", (), {"index": i, "time_seconds": float(i) * 0.5, "data": None})()
+
+    monkeypatch.setattr(detector_module, "YOLODetector", _FakeDet)
+    monkeypatch.setattr(media_samples_module, "iter_media_samples", _FakeMedia)
+    monkeypatch.setattr(realtime_module, "aggregate_window_state", realtime_module.aggregate_window_state)
+
+    manifest = tmp_path / "manifests" / "video_manifest.csv"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"fake")
+    manifest.write_text(
+        "video_id,rights_status,rights_reference,match_id,local_path\n"
+        f"v1,owned,ref1,,{clip}\n"
+    )
+    out = tmp_path / "live"
+    # Typer's exists=True is satisfied by a real (empty) file; the realtime
+    # pipeline monkeypatches iter_media_samples so the content is irrelevant.
+    result = runner.invoke(
+        app,
+        [
+            "video",
+            "live-watch",
+            "--input", str(clip),
+            "--model-path", "models/yolov8n.pt",
+            "--manifest", str(manifest),
+            "--video-id", "v1",
+            "--licensed-root", str(tmp_path),
+            "--output-dir", str(out),
+            "--config", "configs/live_triggers.json",
+            "--stride", "1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (out / "win_probability.csv").exists()
+    assert (out / "triggers.csv").exists()
+
+
+def test_capture_cli_detect_writes_state(tmp_path, monkeypatch) -> None:
+    import soccer_edge.object_model as object_model_module
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda device: _FakeCap(device))
+    monkeypatch.setattr(cv2, "VideoWriter", lambda path, fourcc, fps, size: _FakeWriter(path, fourcc, fps, size))
+    monkeypatch.setattr(object_model_module, "LocalObjectRunner", _FakeRunner)
+    manifest = tmp_path / "manifests" / "video_manifest.csv"
+    state_out = tmp_path / "state"
+    result = runner.invoke(
+        app,
+        [
+            "capture",
+            "webcam",
+            "--detect",
+            "--object-model-path",
+            "models/yolov8n.pt",
+            "--rights-status",
+            "owned",
+            "--rights-reference",
+            "ref1",
+            "--duration",
+            "0.2",
+            "--detections-output",
+            str(tmp_path / "det.csv"),
+            "--output",
+            str(tmp_path / "cap.mp4"),
+            "--state-output",
+            str(state_out),
+            "--manifest",
+            str(manifest),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert state_out.exists()
 
 
 def test_capture_and_detect_zero_frames_no_video(tmp_path, monkeypatch) -> None:

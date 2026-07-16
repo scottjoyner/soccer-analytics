@@ -113,6 +113,30 @@ soccer-edge capture screen --detect --object-model-path models/yolov8n.pt --anno
 soccer-edge capture webcam --detect --object-model-path models/yolov8n.pt --duration 30 --device 0 --rights-status owned --rights-reference "license-abc"
 ```
 
+Add `--state-output <dir>` to persist a rolling realtime state during capture
+(tracks/ball continuity, low-confidence review queue, per-window aggregates):
+
+```bash
+soccer-edge capture webcam --detect --object-model-path models/yolov8n.pt --state-output data/processed/capture_state --duration 30 --device 0 --rights-status owned --rights-reference "license-abc"
+```
+
+Watch an already-approved clip live — rights-gated YOLO detection, rolling
+realtime state, expected-winner probability, and actionable triggers
+(expected-winner, momentum, comeback), writing `win_probability.csv` and
+`triggers.csv`:
+
+```bash
+soccer-edge video live-watch \
+  --input <saved_file> --model-path models/yolov8n.pt \
+  --manifest manifests/video_manifest.csv --video-id <video_id> \
+  --output-dir data/processed/live_watch --config configs/live_triggers.json
+```
+
+The win-probability has two modes (`configs/live_triggers.json`): `elo`
+(calibration-free, default, no artifact needed) and `logistic_bundle` (uses a
+trained `match-predictor` bundle, falling back to `elo` when `bundle_dir` is
+unset). No pitch calibration is used — possession is a ball/player-x proxy.
+
 Wire a captured clip (or any approved local footage) straight into the match-outcome
 model — rights-gated YOLO detection, per-match feature aggregation, merge with
 open-event features, and training — by `match_id`:

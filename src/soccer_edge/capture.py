@@ -247,20 +247,40 @@ def capture_and_detect(
     annotate: bool = False,
     codec: str = "mp4v",
     mss_module=None,
+    video_id: str = "",
+    state_output: Path | None = None,
+    review_threshold: float = 0.4,
+    window_seconds: float = 10.0,
 ) -> dict[str, Path]:
     """Capture a video source while running live object detection on each frame.
 
     Writes a detections table (``frame_idx``, ``timestamp_seconds``, ``class_name``,
     ``confidence``, box coordinates) and, optionally, an annotated video. The
     footage is therefore processed as it is captured, not only after saving.
+
+    When ``state_output`` is given, the live frames are also run through the
+    realtime state manager (``realtime.RealtimeDetector``): track/ball continuity
+    across frames, a rolling buffer, and a low-confidence review queue - the same
+    state the offline pipeline routes to human review. State tables are written
+    alongside the detections table.
     """
 
     from soccer_edge.object_model import LocalObjectRunner
+    from soccer_edge.video.detector import YOLODetector
+    from soccer_edge.realtime.realtime_state import RealtimeDetector as RTDetector
 
     if runner is None:
         if model_path is None:
             raise ValueError("model_path or runner is required for detection")
         runner = LocalObjectRunner(model_path)
+
+    rt = None
+    if state_output is not None:
+        rt = RTDetector(
+            YOLODetector(model_path, confidence_threshold=0.25) if model_path is not None else runner,
+            review_threshold=review_threshold,
+            window_seconds=window_seconds,
+        )
 
     detections: list[dict] = []
     writer = None
@@ -290,6 +310,8 @@ def capture_and_detect(
                         "y2": float(row["y2"]),
                     }
                 )
+            if rt is not None:
+                rt.process_frame(frame, timestamp_seconds=round(elapsed, 3))
             display = _draw_boxes(frame, rows) if annotate else frame
             if output_video is not None:
                 if writer is None:
@@ -304,7 +326,14 @@ def capture_and_detect(
         return {"video": None, "detections": None}
     detections_path = _write_detections_csv(detections, detections_output)
     saved_video = Path(output_video) if (output_video is not None and frames_written > 0) else None
-    return {"video": saved_video, "detections": detections_path}
+    result: dict[str, Path] = {"video": saved_video, "detections": detections_path}
+    if rt is not None:
+        state_output = Path(state_output)
+        rt.flush()
+        state_paths = rt.state.write_state_tables(state_output, video_id=video_id)
+        result["state"] = state_output
+        result["review_queue"] = state_paths.get("review_queue", state_output / "review_queue.parquet")
+    return result
 
 
 def capture_and_detect_and_register(
@@ -336,6 +365,9 @@ def capture_and_detect_and_register(
     notes: str = "",
     codec: str = "mp4v",
     mss_module=None,
+    state_output: Path | None = None,
+    review_threshold: float = 0.4,
+    window_seconds: float = 10.0,
 ) -> tuple[Path, Path, VideoManifestRow]:
     if capture_source == "image":
         raise ValueError("live detection requires a video source (screen/webcam), not image")
@@ -355,6 +387,10 @@ def capture_and_detect_and_register(
         annotate=annotate,
         codec=codec,
         mss_module=mss_module,
+        video_id=video_id or "",
+        state_output=state_output,
+        review_threshold=review_threshold,
+        window_seconds=window_seconds,
     )
     saved_video = result["video"]
     detections_path = result["detections"]

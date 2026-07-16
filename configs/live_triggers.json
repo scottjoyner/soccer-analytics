@@ -1,0 +1,29 @@
+{
+  "window_seconds": 10.0,
+  "stride_seconds": 1.0,
+  "min_confidence": 0.25,
+  "low_confidence_queue_threshold": 0.4,
+  "video_width": 1920.0,
+  "video_height": 1080.0,
+  "team_mapping": {
+    "home": "home",
+    "away": "away"
+  },
+  "win_probability": {
+    "method": "logistic_bundle",
+    "bundle_dir": null,
+    "prior_home": 0.5,
+    "prior_draw": 0.2,
+    "prior_away": 0.3,
+    "smoothing": 0.25,
+    "min_observations": 5
+  },
+  "triggers": {
+    "expected_winner_confidence": 0.6,
+    "expected_winner_min_gap": 0.15,
+    "momentum_window_seconds": 30.0,
+    "momentum_min_shift": 0.12,
+    "comeback_min_deficit": 0.2,
+    "cooldown_seconds": 20.0
+  }
+}

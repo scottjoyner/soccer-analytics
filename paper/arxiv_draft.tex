@@ -162,6 +162,23 @@ normalized to the frame. We additionally rasterize each frame into an
 occupancy grid (channels $\times$ height $\times$ width, default
 $3\times 8\times 8$) for the convolutional model.
 
+Beyond per-match aggregation, the same detector drives a realtime abstraction
+used to watch approved local footage live. A \texttt{RealtimeDetector} maintains
+a rolling buffer and class-aware nearest-centroid track matching (no
+re-identification or Kalman filter) to persist frame-to-frame tracks, a
+ball/player rolling state, and a low-confidence review queue. Over a sliding
+window it aggregates possession share, territory, pressure rate, and an
+xT-proxy from the ball/player geometry, then updates an expected-winner
+probability. Two modes are supported: a calibration-free \emph{elo drift} fallback
+(default, requiring no trained artifact) and a \emph{logistic bundle} mode that
+scores the live feature vector with a trained match-outcome model, falling back
+to elo drift when no bundle is configured. Exponential smoothing is applied
+across windows, and actionable triggers (expected-winner, momentum, comeback)
+are emitted as they fire. No pitch calibration is used, since players are
+undifferentiated in the lightweight setup; possession is therefore a
+ball/player-$x$ proxy, consistent with the offline right-gate policy that
+public video URLs are discovery metadata only.
+
 \section{Feature Aggregation}
 Player statistics are aggregated with \texttt{build\_player\_aggregates}, which
 yields cross-match totals, per-match averages, appearances, and an overall pass

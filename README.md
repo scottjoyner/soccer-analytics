@@ -197,6 +197,39 @@ pointing at an approved, rights-referenced row under the licensed root is requir
 (bypassing it is intentionally not exposed on the CLI). Public URLs are discovery
 metadata only and can never be opened as inputs.
 
+#### Realtime detection & live win-probability
+
+`capture screen --detect` / `capture webcam --detect` can also persist a rolling
+realtime state alongside the recording via `--state-output <dir>`: tracks and ball
+continuity (class-aware nearest-centroid matching, no ReID/Kalman), a
+low-confidence review queue, and per-window possession/territory/pressure/xT-proxy
+aggregates. The detections are produced by the same rights-gated detector.
+
+To watch an already-approved clip end to end, `video live-watch` runs rights-gated
+YOLO detection frame-by-frame, maintains the rolling realtime state, updates an
+expected-winner probability every window, and prints actionable triggers
+(expected-winner, momentum, comeback) as they fire:
+
+```bash
+soccer-edge capture webcam --detect --object-model-path models/yolov8n.pt \
+  --state-output data/processed/capture_state --duration 30 --device 0 \
+  --rights-status owned --rights-reference "personal-recording://self"
+
+soccer-edge video live-watch \
+  --input data/raw/video_licensed/captures/screen_001.mp4 \
+  --model-path models/yolov8n.pt --manifest manifests/video_manifest.csv \
+  --video-id screen_001 --output-dir data/processed/live_watch \
+  --config configs/live_triggers.json
+```
+
+`live-watch` writes `win_probability.csv` and `triggers.csv` into the output dir.
+Win-probability has two modes (see `configs/live_triggers.json`): `elo` (the
+default, calibration-free, requires no trained artifact) and `logistic_bundle`
+(uses a trained `train match-predictor` bundle, falling back to `elo` when no
+`bundle_dir` is configured). Both modes apply exponential smoothing across windows.
+No pitch calibration is used — players are undifferentiated, so possession is a
+ball/player-x proxy; the study is offline/research only.
+
 ### Match-outcome models
 
 ```bash

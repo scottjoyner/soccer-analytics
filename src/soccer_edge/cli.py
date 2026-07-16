@@ -394,6 +394,130 @@ def detect_yolo(
     console.print({name: str(path) for name, path in paths.items()})
 
 
+@video_app.command("live-watch")
+def live_watch(
+    input_path: Path = typer.Option(..., "--input", exists=True, help="Approved local footage (capture or licensed file)."),
+    model_path: Path = typer.Option(..., exists=True, help="YOLO weights, e.g. yolov8n.pt or a fine-tuned .pt."),
+    manifest: Path | None = typer.Option(None, "--manifest", exists=True, help="Local video manifest with recorded rights."),
+    video_id: str | None = typer.Option(None, "--video-id", help="Approved manifest row to process."),
+    licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
+    output_dir: Path = typer.Option(Path("data/processed/live_watch")),
+    config: Path = typer.Option(Path("configs/live_triggers.json"), exists=True, help="Live triggers/win-prob config."),
+    stride: int = typer.Option(1, help="Frame stride (1 = every frame)."),
+    max_samples: int | None = typer.Option(None),
+    confidence: float = typer.Option(0.25),
+    window_seconds: float = typer.Option(10.0, help="Rolling window length for live state."),
+) -> None:
+    """Watch approved local footage live: realtime detection, win-prob, triggers.
+
+    Runs rights-gated YOLO detection over the clip, maintains a rolling realtime
+    state (track/ball continuity + low-confidence review queue), updates an expected-
+    winner probability every window, and prints actionable triggers (expected winner,
+    momentum, comeback) as they fire. The footage must be an approved, rights-
+    referenced manifest row; public URLs are discovery metadata only and refused.
+    """
+    import json as _json
+
+    _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
+    cfg = _json.loads(Path(config).read_text(encoding="utf-8"))
+    from soccer_edge.realtime import (
+        RealtimeDetector,
+        WinProbConfig,
+        TriggerConfig,
+    )
+    wp_cfg = WinProbConfig.from_dict(cfg.get("win_probability", {}))
+    trig_cfg = TriggerConfig.from_dict(cfg.get("triggers", {}))
+
+    from soccer_edge.video.detector import YOLODetector
+
+    # Reuse the same rights-gated detector the offline pipeline uses.
+    detector = YOLODetector(model_path, confidence_threshold=confidence)
+    rt = RealtimeDetector(
+        detector,
+        window_seconds=window_seconds,
+        on_window=_make_live_window_cb(output_dir, wp_cfg, trig_cfg),
+    )
+    # Drive the detector over the file frame-by-frame (re-uses iter_media_samples'
+    # scheme/root guard, so remote URLs are still refused).
+    from soccer_edge.media_samples import iter_media_samples
+
+    n = 0
+    for sample in iter_media_samples(input_path, stride=stride, max_samples=max_samples):
+        rt.process_frame(sample.data, timestamp_seconds=sample.time_seconds)
+        n += 1
+    rt.flush()
+    console.print(f"watched {n} frame(s); state + triggers written to {output_dir}")
+
+
+def _make_live_window_cb(output_dir, wp_cfg, trig_cfg):
+    from pathlib import Path as _Path
+
+    import pandas as pd
+    from soccer_edge.realtime import (
+        LiveWinProbability,
+        TriggerEngine,
+        aggregate_window_state,
+    )
+
+    out = _Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    wp = LiveWinProbability(wp_cfg)
+    engine = TriggerEngine(trig_cfg)
+    probs_path = out / "win_probability.csv"
+    trig_path = out / "triggers.csv"
+    # Seed both outputs with headers so downstream consumers always find a schema.
+    if not probs_path.exists():
+        pd.DataFrame(
+            columns=["window_start", "window_end", "p_home", "p_draw", "p_away", "expected_winner"]
+        ).to_csv(probs_path, index=False)
+    if not trig_path.exists():
+        pd.DataFrame(
+            columns=["kind", "side", "window_start", "window_end", "probability", "message"]
+        ).to_csv(trig_path, index=False)
+
+    def cb(state, window_start, window_end):
+        df = pd.DataFrame(state.frame_rows())
+        live = aggregate_window_state(df, window_start, window_end)
+        prob = wp.update(live)
+        triggers = engine.observe(window_start, window_end, prob)
+        _append_csv(
+            probs_path,
+            {
+                "window_start": window_start,
+                "window_end": window_end,
+                "p_home": float(prob[0]),
+                "p_draw": float(prob[1]),
+                "p_away": float(prob[2]),
+                "expected_winner": wp.expected_winner(),
+            },
+        )
+        for t in triggers:
+            _append_csv(
+                trig_path,
+                {
+                    "kind": t.kind,
+                    "side": t.side,
+                    "window_start": t.window_start,
+                    "window_end": t.window_end,
+                    "probability": t.probability,
+                    "message": t.message,
+                },
+            )
+            console.print(f"[trigger] {t.message}")
+
+    return cb
+
+
+def _append_csv(path: Path, row: dict) -> None:
+    import pandas as pd
+
+    df = pd.DataFrame([row])
+    if path.exists():
+        df.to_csv(path, mode="a", header=False, index=False)
+    else:
+        df.to_csv(path, index=False)
+
+
 @video_app.command("attach-frame-images")
 def attach_frame_images(
     detections: Path = typer.Option(..., exists=True),
@@ -1540,6 +1664,7 @@ def _run_capture(
     object_model_path: Path | None = None,
     detections_output: Path | None = None,
     annotate: bool = False,
+    state_output: Path | None = typer.Option(None, help="Write realtime state tables (tracks/ball/review queue)."),
 ) -> None:
     console.print(CAPTURE_SAFETY_NOTE)
     _require_rights(rights_status, rights_reference)
@@ -1574,6 +1699,16 @@ def _run_capture(
             away_team=away_team,
             period=period,
             notes=notes,
+            state_output=state_output,
+        )
+        console.print(f"captured={saved_video}")
+        console.print(f"detections={detections_path}")
+        if state_output is not None:
+            console.print(f"state_tables={state_output}")
+        console.print(f"manifest={manifest} video_id={row.video_id}")
+        console.print(
+            "next: soccer-edge video prepare-object-dataset --source "
+            f"{detections_path} --output-dir data/processed/captured_yolo --classes player,ball"
         )
         console.print(f"captured={saved_video}")
         console.print(f"detections={detections_path}")
@@ -1676,6 +1811,7 @@ def capture_webcam_cmd(
     object_model_path: Path | None = typer.Option(None, help="YOLO weights when --detect is set."),
     detections_output: Path | None = typer.Option(None, help="Detections CSV output when --detect is set."),
     annotate: bool = typer.Option(False, help="Draw detection boxes onto the saved video."),
+    state_output: Path | None = typer.Option(None, help="Write realtime state tables (tracks/ball/review queue)."),
     output: Path | None = typer.Option(None),
     rights_status: str = typer.Option(..., help="owned | licensed | compatible_license"),
     rights_reference: str = typer.Option(..., help="Explicit written-rights reference."),
@@ -1716,6 +1852,7 @@ def capture_webcam_cmd(
         object_model_path=object_model_path,
         detections_output=detections_output,
         annotate=annotate,
+        state_output=state_output,
         suffix=".mp4",
     )
 
