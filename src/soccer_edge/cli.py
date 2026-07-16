@@ -305,9 +305,15 @@ def process_video(
     video_id: str | None = typer.Option(None, "--video-id", help="video_id of the approved manifest row to process."),
     licensed_root: Path = typer.Option(Path("data/raw/video_licensed"), "--licensed-root"),
 ) -> None:
-    """Run the first local licensed video processing stub."""
+    """Run the first local licensed video processing stub.
+
+    NOTE: this is a placeholder that writes empty state tables and does NOT yet
+    extract footage. Use `capture`, `export-frames`, or `process-local-model` for
+    real processing. The rights gate is still enforced.
+    """
 
     _enforce_rights_gate(manifest, video_id, input_path, licensed_root)
+    console.print("[warning] `video process` is a stub: it writes empty tables and does not extract footage yet.")
     result = run_media_table_stub(input_path=input_path, output_dir=output_dir, frame_count=frame_count)
     console.print(result)
 
@@ -1396,6 +1402,12 @@ def examples_match_prediction(
     on production data.
     """
 
+    if not detections.exists():
+        raise FileNotFoundError(
+            f"detections file not found: {detections}. Run `soccer-edge video detect-yolo` "
+            "(or `capture to-match-predictor`) first to produce a detections table, or pass "
+            "--detections with an existing path."
+        )
     det_frame = pd.read_parquet(detections) if detections.suffix == ".parquet" else pd.read_csv(detections)
     res_frame = pd.read_csv(results)
     labeled = match_result_labels(res_frame)
@@ -1480,18 +1492,18 @@ def _synthetic_detections(match_id: str, frame_count: int = 6) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-@app.command()
+@app.command(hidden=True)
 def calibrate() -> None:
-    """Calibrate model probabilities."""
+    """[DEPRECATED/STUB] Use `soccer-edge model calibration-review` instead."""
 
-    console.print("Use: soccer-edge model calibration-review --predictions <csv-or-parquet>")
+    console.print("Deprecated. Use: soccer-edge model calibration-review --predictions <csv-or-parquet>")
 
 
-@app.command()
+@app.command(hidden=True)
 def evaluate() -> None:
-    """Evaluate models offline."""
+    """[DEPRECATED/STUB] Use `soccer-edge model evaluate` instead."""
 
-    console.print("Use: soccer-edge model evaluate --predictions <csv-or-parquet>")
+    console.print("Deprecated. Use: soccer-edge model evaluate --predictions <csv-or-parquet>")
 
 
 CAPTURE_SAFETY_NOTE = (
@@ -1766,7 +1778,6 @@ def capture_to_match_predictor(
     stride: int = typer.Option(1),
     max_samples: int | None = typer.Option(None),
     confidence: float = typer.Option(0.25),
-    enforce_rights: bool = typer.Option(True, "--enforce-rights/--no-enforce-rights", help="Enforce the rights gate on the footage (default on)."),
 ) -> None:
     """Capture/footage -> rights-gated YOLO detection -> merged features -> match predictor.
 
@@ -1790,6 +1801,5 @@ def capture_to_match_predictor(
         stride=stride,
         max_samples=max_samples,
         confidence_threshold=confidence,
-        enforce_rights=enforce_rights,
     )
     console.print({name: str(path) for name, path in paths.items()})

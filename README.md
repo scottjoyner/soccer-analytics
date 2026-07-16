@@ -192,8 +192,10 @@ soccer-edge capture to-match-predictor \
   --event-source examples/statsbomb --stride 5
 ```
 
-Omit `--manifest`/`--video-id` only when you pass `--enforce-rights false` for
-synthetic/local testing; production runs require the gate.
+The rights gate is mandatory for this command: a `--manifest`/`--video-id` pair
+pointing at an approved, rights-referenced row under the licensed root is required
+(bypassing it is intentionally not exposed on the CLI). Public URLs are discovery
+metadata only and can never be opened as inputs.
 
 ### Match-outcome models
 

@@ -10,7 +10,7 @@ def test_iter_media_samples_missing_or_bad_file(tmp_path) -> None:
         samples = list(iter_media_samples(bad_path, max_samples=1))
     except MissingMediaReaderError:
         pytest.skip("optional reader dependency is not installed")
-    except ValueError:
+    except (ValueError, FileNotFoundError):
         return
     assert samples == []
 

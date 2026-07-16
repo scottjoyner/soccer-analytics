@@ -36,7 +36,8 @@ def test_run_yolo_detection_refuses_missing_manifest_row(tmp_path) -> None:
 def test_run_yolo_detection_allows_explicit_bypass_flag(tmp_path) -> None:
     # Callers processing synthetic/pre-approved frames may opt out; the gate no-ops and
     # the function proceeds (it will still fail later if the model/path is invalid, but
-    # the rights gate is the thing under test here).
+    # the rights gate is the thing under test here). A missing local input still fails
+    # fast with FileNotFoundError (not the gate message).
     try:
         run_yolo_detection(
             input_path=tmp_path / "clip.mp4",
@@ -44,6 +45,6 @@ def test_run_yolo_detection_allows_explicit_bypass_flag(tmp_path) -> None:
             model_path="yolov8n.pt",
             enforce_rights=False,
         )
-    except ValueError as exc:
-        # Expected only if/when the model or media reader fails; the gate must NOT be the cause.
+    except (ValueError, FileNotFoundError) as exc:
+        # The rights gate must NOT be the cause of the failure.
         assert "requires an approved manifest row" not in str(exc)

@@ -14,6 +14,6 @@ def test_export_video_frame_manifest_missing_or_bad_file(tmp_path) -> None:
         path = export_video_frame_manifest(tmp_path / "missing.mp4", tmp_path / "frames", tmp_path / "frames.csv", max_frames=1)
     except MissingMediaReaderError:
         pytest.skip("optional reader dependency is not installed")
-    except ValueError:
+    except (ValueError, FileNotFoundError):
         return
     assert path.exists()

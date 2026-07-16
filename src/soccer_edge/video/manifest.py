@@ -159,3 +159,14 @@ def validate_processable_video(
             f"Video {row.video_id} local_path does not exist: {local_path}; "
             "cannot process a manifest row whose file is missing."
         )
+
+    # Resolve through any symlinks so a symlink inside licensed_root that points
+    # elsewhere cannot smuggle in an unapproved file, and refuse non-regular files.
+    real_path = local_path.resolve()
+    if real_path.is_symlink() or real_path != local_path:
+        if root not in real_path.parents and real_path != root:
+            raise ValueError(
+                f"Video {row.video_id} resolves outside licensed root via symlink: {real_path}"
+            )
+    if not real_path.is_file():
+        raise ValueError(f"Video {row.video_id} local_path is not a regular file: {real_path}")

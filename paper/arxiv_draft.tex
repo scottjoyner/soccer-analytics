@@ -113,13 +113,17 @@ A real-time mode (\texttt{--detect}) runs the YOLO detector on each frame as it
 is recorded, emitting a per-frame detections table (and, optionally, an
  annotated video) so footage is processed \emph{as} it is captured rather than
  only after saving; the resulting file and detections feed the same
- rights-gated fine-tuning path. A single command
- (\texttt{capture to-match-predictor}) wires an approved clip end-to-end into the
- match-outcome model: rights-gated YOLO detection, per-match feature aggregation,
- and a \texttt{match\_id}-keyed merge with open-event features
- (xG/xT/pressure) from StatsBomb, Metrica, OpenFootball, and football-data, so
- captured footage trains alongside the other data sources without leaking frames
- across the train/validation split.
+  rights-gated fine-tuning path. A single command
+  (\texttt{capture to-match-predictor}) wires an approved clip end-to-end into the
+  match-outcome model: rights-gated YOLO detection, per-match feature aggregation,
+  and a \texttt{match\_id}-keyed merge with open-event features
+  (xG/xT/pressure) from StatsBomb, Metrica, OpenFootball, and football-data, so
+  captured footage trains alongside the other data sources without leaking frames
+  across the train/validation split. The merged event features are passed through
+  to the trainer (not silently dropped), and the footage input gate refuses
+  remote/streaming URLs and resolves symlinks before any frame is opened, so a
+  symlink inside the licensed root cannot smuggle in an unapproved file.
+
 
 
 \section{Data}

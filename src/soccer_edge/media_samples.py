@@ -2,8 +2,32 @@ from dataclasses import dataclass
 import warnings
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import urlparse
 
 from soccer_edge.media_reader import require_media_reader
+
+BLOCKED_SCHEMES = ("http", "https", "rtmp", "rtsp", "ftp")
+
+
+def assert_local_input(input_path: Path) -> None:
+    """Refuse to open remote/streaming URLs as detection inputs.
+
+    Public video URLs are discovery metadata only (AGENTS.md hard safety rules)
+    and must never be opened for inference. This guard runs even when the rights
+    gate is bypassed for synthetic/pre-approved local frames, so a remote URL can
+    never reach MediaSample iteration.
+    """
+
+    raw = str(input_path)
+    parsed = urlparse(raw)
+    if parsed.scheme and parsed.scheme.lower() in BLOCKED_SCHEMES:
+        raise ValueError(
+            f"refusing to open remote/streaming input {raw!r}: public URLs are "
+            "discovery metadata only and must not be used as processing inputs."
+        )
+    path = Path(input_path)
+    if not path.exists():
+        raise FileNotFoundError(f"input not found: {path}")
 
 
 @dataclass(frozen=True)
@@ -16,6 +40,7 @@ class MediaSample:
 def iter_media_samples(input_path: Path, stride: int = 1, max_samples: int | None = None) -> Iterator[MediaSample]:
     if stride <= 0:
         raise ValueError("stride must be positive")
+    assert_local_input(input_path)
     reader = require_media_reader()
     handle = reader.VideoCapture(str(input_path))
     if not handle.isOpened():

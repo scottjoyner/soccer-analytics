@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
+from soccer_edge.features.statsbomb_features import default_event_features
 from soccer_edge.models.bundle import save_bundle
 from soccer_edge.models.prediction_export import export_bundle_predictions
 from soccer_edge.models.simple_classifier import fit_simple_classifier
@@ -25,13 +26,17 @@ from soccer_edge.video.yolo_pipeline import run_yolo_detection
 PLAYER_CLASSES = {"player", "person"}
 BALL_CLASSES = {"ball", "sports ball"}
 
-FEATURE_COLUMNS = [
+# CV detection features always available for a captured/licensed clip.
+CV_FEATURE_COLUMNS = [
     "n_player",
     "n_ball",
     "avg_det_per_frame",
     "ball_center_x",
     "ball_center_y",
 ]
+
+# Columns that are labels/identifiers, never model features.
+LABEL_COLUMNS = ("match_id", "home_score", "away_score", "winner")
 
 
 def derive_winner_label(home_score: float, away_score: float) -> int:
@@ -85,24 +90,6 @@ def aggregate_video_features(detections: pd.DataFrame, video_width: float = 1920
     }
 
 
-def build_prediction_dataset(
-    detections: pd.DataFrame,
-    results: pd.DataFrame,
-    match_id: str | None = None,
-) -> pd.DataFrame:
-    features = aggregate_video_features(detections)
-    if match_id is not None:
-        features["match_id"] = match_id
-        row = results[results["match_id"] == match_id]
-        if len(row) == 0:
-            raise ValueError(f"no match result for match_id={match_id!r}")
-        result = row.iloc[0]
-        features["home_score"] = int(result["home_score"])
-        features["away_score"] = int(result["away_score"])
-        features["winner"] = derive_winner_label(result["home_score"], result["away_score"])
-    return pd.DataFrame([features])
-
-
 def merge_match_features(
     detections_by_match: dict[str, pd.DataFrame],
     results: pd.DataFrame,
@@ -119,6 +106,7 @@ def merge_match_features(
     """
 
     labeled = match_result_labels(results)
+    allowed_event = set(default_event_features())
     rows: list[dict] = []
     for match_id in labeled["match_id"]:
         detections = detections_by_match.get(match_id)
@@ -133,10 +121,11 @@ def merge_match_features(
         if event_features is not None and len(event_features) > 0:
             ev = event_features[event_features["match_id"] == match_id]
             if len(ev) > 0:
-                for column in ev.columns:
-                    if column in ("match_id", "winner", "home_score", "away_score"):
-                        continue
-                    row[column] = ev.iloc[0][column]
+                # Only copy the curated event-feature columns (xG/xT/pressure/...);
+                # identifiers and labels are never merged as features.
+                for column in allowed_event:
+                    if column in ev.columns:
+                        row[column] = ev.iloc[0][column]
         rows.append(row)
     if not rows:
         raise ValueError("no matches in results matched the supplied detection tables")
@@ -195,12 +184,24 @@ def run_capture_to_match_predictor(
     detections = pd.read_parquet(detections_path) if detections_path.suffix == ".parquet" else pd.read_csv(detections_path)
 
     effective_match_id = match_id or (rights_video_id if rights_video_id is not None else Path(video_path).stem)
+    if results["match_id"].astype(str).eq(str(effective_match_id)).sum() == 0:
+        available = ", ".join(str(m) for m in results["match_id"].unique()[:10])
+        raise ValueError(
+            f"match_id {effective_match_id!r} (derived from --match-id / --video-id / "
+            f"filename) is not present in the results table. Pass --match-id explicitly. "
+            f"Available match_ids: {available}"
+        )
     detections_by_match = {effective_match_id: detections}
     event_features = load_event_features(event_source) if event_source is not None else None
     dataset = merge_match_features(detections_by_match, results, event_features=event_features)
     dataset_path = output_dir / "dataset.csv"
     dataset.to_csv(dataset_path, index=False)
-    bundle = train_match_predictor(dataset, output_dir / "model")
+    # Train on every merged column (CV features + any open-event features) except
+    # the label/identifier columns, so merged xG/xT/pressure actually reach the model.
+    feature_columns = [
+        c for c in dataset.columns if c not in LABEL_COLUMNS and c not in CV_FEATURE_COLUMNS
+    ] + CV_FEATURE_COLUMNS
+    bundle = train_match_predictor(dataset, output_dir / "model", feature_columns=feature_columns)
     return {
         "dataset": dataset_path,
         "winner_model": bundle["winner_model"],
@@ -254,13 +255,32 @@ def train_match_predictor(
     output_dir: Path,
     feature_columns: Iterable[str] | None = None,
 ) -> dict[str, object]:
-    feature_columns = list(feature_columns or FEATURE_COLUMNS)
     output_dir = Path(output_dir)
+    if "winner" not in dataset.columns:
+        raise ValueError("dataset missing 'winner' label column")
+
+    if feature_columns is None:
+        # Default: every column that is not a label/identifier, so CV features and
+        # any merged open-event features (xG/xT/pressure) are all used.
+        feature_columns = [c for c in dataset.columns if c not in LABEL_COLUMNS]
+    else:
+        feature_columns = list(feature_columns)
     missing = [column for column in feature_columns if column not in dataset.columns]
     if missing:
         raise ValueError(f"missing feature columns: {missing}")
-    if "winner" not in dataset.columns:
-        raise ValueError("dataset missing 'winner' label column")
+    if len(feature_columns) == 0:
+        raise ValueError("no feature columns available to train on")
+
+    # A winner classifier needs at least two outcome classes; a single captured
+    # match (one winner value) cannot train one. Tell the caller to provide more
+    # labeled matches rather than crashing deep inside sklearn.
+    n_classes = dataset["winner"].nunique()
+    if n_classes < 2:
+        raise ValueError(
+            f"cannot train a winner classifier with only {n_classes} outcome class(es); "
+            "provide match results with at least two distinct outcomes (e.g. multiple "
+            "captured matches or open-event rows)."
+        )
 
     winner_paths = fit_simple_classifier(dataset, feature_columns, "winner", output_dir / "winner")
     home_paths = _fit_score_regressor(dataset, feature_columns, "home_score", output_dir / "home_score")

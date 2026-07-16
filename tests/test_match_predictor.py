@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 from pathlib import Path
 
 from soccer_edge.pipeline.match_predictor import (
@@ -28,7 +29,7 @@ def test_run_capture_to_match_predictor_orchestrates(monkeypatch, tmp_path) -> N
     # The trainer needs labeled data from >=2 classes; a single captured match
     # provides one. Stub it so the orchestration (detect->merge->dataset) is
     # exercised without requiring a multi-class training set in this unit test.
-    def fake_train(dataset, output_dir):
+    def fake_train(dataset, output_dir, feature_columns=None):
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         (out / "winner_model.pkl").write_bytes(b"stub")
@@ -139,6 +140,75 @@ def test_aggregate_video_features_counts_classes() -> None:
     assert features["n_ball"] == 1
     assert features["n_frames"] == 2
     assert 0.0 < features["ball_center_x"] < 1.0
+
+
+def test_train_match_predictor_single_class_raises(tmp_path) -> None:
+    from soccer_edge.pipeline.match_predictor import train_match_predictor
+
+    # A single captured match yields one winner class; training must fail loudly
+    # (not crash deep inside sklearn).
+    dataset = pd.DataFrame(
+        [
+            {"match_id": "m1", "n_player": 2, "n_ball": 1, "avg_det_per_frame": 1.5,
+             "ball_center_x": 0.1, "ball_center_y": 0.2, "home_score": 2, "away_score": 1,
+             "winner": 0},
+        ]
+    )
+    with pytest.raises(ValueError, match="only .* outcome class"):
+        train_match_predictor(dataset, tmp_path / "model")
+
+
+def test_run_capture_merges_real_statsbomb_event_features(monkeypatch, tmp_path) -> None:
+    import pandas as pd
+    from pathlib import Path
+    from soccer_edge.pipeline import match_predictor as mp
+    from soccer_edge.features.statsbomb_features import build_match_event_features
+
+    event = build_match_event_features(Path("examples/statsbomb"))
+    if len(event) == 0:
+        pytest.skip("examples/statsbomb has no joinable event rows in this fixture")
+    sb_match = str(event.iloc[0]["match_id"])
+
+    # Write a synthetic detections table as run_yolo_detection would.
+    def fake_detect(input_path, output_dir, model_path, **kwargs):
+        from soccer_edge.video.detector import Detection
+        from soccer_edge.video.state_tables import write_video_state_tables
+
+        detections = [
+            Detection(frame_idx=0, class_name="player", confidence=0.9, x1=0, y1=0, x2=10, y2=10),
+            Detection(frame_idx=1, class_name="ball", confidence=0.8, x1=5, y1=5, x2=15, y2=15),
+        ]
+        return write_video_state_tables(output_dir=output_dir, detections=detections)
+
+    # Capture trains on the merged columns; the single match has one winner class,
+    # so stub the trainer to confirm the merged dataset actually carries event cols.
+    captured: dict = {}
+
+    def fake_train(dataset, output_dir):
+        captured["columns"] = list(dataset.columns)
+        out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "winner_model.pkl").write_bytes(b"stub")
+        pd.DataFrame([{"match_id": sb_match, "pred_winner": 0}]).to_csv(out / "predictions.csv", index=False)
+        return {"winner_model": out / "winner_model.pkl", "predictions": out / "predictions.csv"}
+
+    monkeypatch.setattr(mp, "run_yolo_detection", fake_detect)
+    monkeypatch.setattr(mp, "train_match_predictor", fake_train)
+
+    results = pd.DataFrame([{"match_id": sb_match, "home_score": 1, "away_score": 0}])
+    mp.run_capture_to_match_predictor(
+        video_path=tmp_path / "clip.mp4",
+        results=results,
+        output_dir=tmp_path / "out",
+        model_path="yolov8n.pt",
+        match_id=sb_match,
+        event_source=Path("examples/statsbomb"),
+    )
+    cols = captured["columns"]
+    # CV features always present.
+    assert "n_player" in cols and "n_ball" in cols
+    # At least one curated open-event feature (xG/xT/pressure/...) must reach training.
+    assert any(c in cols for c in ("home_xg", "home_xt", "home_pressure_regains", "home_n_pass"))
 
 
 def test_train_match_predictor_writes_bundles(tmp_path) -> None:

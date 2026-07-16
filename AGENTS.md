@@ -228,9 +228,24 @@ Completed in recent work:
     is detection-agnostic and class-aliased (COCO `person`/`sports ball` →
     `player`/`ball`) so captured footage trains alongside the other data sources.
  9. Close low-severity audit items: `dataset_version` is now required on
-    `ingest write-processed` (no silent `"unknown"`), stream truncation warns via
-    `failed_after_frames`, and the dead `run_local_video_pipeline` stub is
-    repurposed into a real rights-gated `run_yolo_detection` wrapper.
+     `ingest write-processed` (no silent `"unknown"`), stream truncation warns via
+     `failed_after_frames`, and the dead `run_local_video_pipeline` stub is removed.
+ 10. Harden the footage input gate: the rights-bypass (`--no-enforce-rights`) CLI flag
+     is removed, and `iter_media_samples`/`run_yolo_detection` refuse remote/streaming
+     URLs (http/https/rtmp/rtsp/ftp) and missing files before any frame is opened. The
+     path/root check in `validate_processable_video` now resolves symlinks and rejects
+     non-regular files, so a symlink inside `licensed_root` cannot smuggle in an
+     unapproved file.
+ 11. Fix the capture→predictor training path: `train_match_predictor` now derives its
+     feature columns from the merged dataset (CV features + curated open-event xG/xT/
+     pressure), so merged event features actually reach the model; it also raises a
+     clear error when only one outcome class is present instead of crashing inside
+     sklearn. `merge_match_features` copies only the curated event-feature columns.
+ 12. Misc robustness/cleanup: `video process` is flagged as a non-extracting stub with a
+     warning, the `calibrate`/`evaluate` stubs are hidden and marked deprecated, the
+     `resolve_baseline_rate` docstring matches its raise-on-missing behavior, and the
+     `examples match-prediction` command gives a friendly missing-detections error.
+
 
 
 Forward-looking:

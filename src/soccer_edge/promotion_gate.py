@@ -47,7 +47,8 @@ def resolve_baseline_rate(frame: pd.DataFrame, majority_baseline_rate: float | N
     When ``majority_baseline_rate`` is explicitly given it wins. Otherwise the
     recorded ``baseline_accuracy`` column (written by the eval-to-metrics bridge)
     is used, so the gate cannot be trivially passed by forgetting to supply a
-    baseline. Falls back to 0.0 only if neither is available.
+    baseline. If neither is available, this raises (it never silently falls back
+    to 0.0) so a no-baseline model cannot slip through the gate.
     """
 
     if majority_baseline_rate is not None:

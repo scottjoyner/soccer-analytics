@@ -69,6 +69,48 @@ def test_manifest_row_outside_root_is_rejected() -> None:
         validate_processable_video(row, Path("data/raw/video_licensed"))
 
 
+def test_manifest_row_symlink_outside_root_is_rejected(tmp_path) -> None:
+    # A symlink inside the licensed root that points outside it must be rejected,
+    # so it cannot smuggle in an unapproved file.
+    root = tmp_path / "licensed"
+    root.mkdir()
+    outside = tmp_path / "outside" / "secret.mp4"
+    outside.parent.mkdir(parents=True, exist_ok=True)
+    outside.write_bytes(b"secret")
+    link = root / "clip_via_symlink.mp4"
+    link.symlink_to(outside)
+    row = manifest_row_from_dict(
+        {
+            "video_id": "clip_sym",
+            "match_id": "match_sym",
+            "clip_type": "highlight",
+            "local_path": str(link),
+            "rights_status": "owned",
+            "rights_reference": "license-file:///perms/x.pdf",
+        }
+    )
+    with pytest.raises(ValueError, match="symlink"):
+        validate_processable_video(row, root)
+
+
+def test_assert_local_input_rejects_remote_urls(tmp_path) -> None:
+    from soccer_edge.media_samples import assert_local_input
+
+    for url in ["https://example.com/clip.mp4", "rtmp://host/stream", "http://x/y.m3u8"]:
+        with pytest.raises(ValueError, match="remote|discovery"):
+            assert_local_input(url)
+    # A local file is accepted.
+    local = tmp_path / "clip.mp4"
+    local.write_bytes(b"data")
+    assert assert_local_input(local) is None
+
+
+def test_assert_local_input_missing_file() -> None:
+    from soccer_edge.media_samples import assert_local_input
+
+    with pytest.raises(FileNotFoundError):
+        assert_local_input("/no/such/file.mp4")
+
 def test_manifest_row_missing_file_is_rejected() -> None:
     row = manifest_row_from_dict(
         {
