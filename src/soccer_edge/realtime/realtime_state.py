@@ -67,15 +67,7 @@ class RealtimeState:
         return (timestamp_seconds - self._last_ingest_t) < self.min_interval_seconds
 
     def _match_tracks(self, detections: list[Detection]) -> list[TrackState]:
-        """Carry track identity across frames via class-aware nearest-centroid matching.
-
-        Each detection this frame is matched to the last-seen track of the SAME
-        class by closest box center; unmatched detections start a fresh track id.
-        Restricting to the same class keeps players and the ball from swapping
-        identities. This is a deliberately simple, calibration-free matcher
-        (no ReID, no Kalman) - enough to give the ball-state series and
-        trajectories stable identities for live state.
-        """
+        """Carry track identity across frames via class-aware nearest-centroid matching."""
 
         prev = list(self.track_memory.values())
         states: list[TrackState] = []
@@ -111,7 +103,6 @@ class RealtimeState:
                 y2=detection.y2,
             )
             states.append(state)
-        # Remember only the tracks seen this frame.
         self.track_memory = {s.track_id: s for s in states}
         return states
 
@@ -135,9 +126,6 @@ class RealtimeState:
             if detection.confidence < self.confidence_floor:
                 continue
             kept.append(detection)
-            # Queue detections that clear the model floor but fall below the
-            # human-review threshold: too unsure to auto-accept, too confident
-            # to discard.
             if self.confidence_floor <= detection.confidence < self.review_threshold:
                 self.review_queue.append(
                     ReviewQueueEntry(
@@ -258,7 +246,7 @@ class RealtimeState:
 
 
 class RealtimeDetector:
-    """Wrap a per-frame detector with the realtime state manager.
+    """Small realtime detector wrapper.
 
     Feed frames via :meth:`process_frame`; the detector runs, detections are matched
     into tracks, and every ``window_seconds`` the accumulated window is handed to a
@@ -292,17 +280,21 @@ class RealtimeDetector:
         self._window_start: float | None = None
         self._frame_idx = 0
 
-    def process_frame(self, frame, timestamp_seconds: float | None = None) -> list[TrackState]:
-        raw = self.detector.detect_frame(self._frame_idx, frame)
-        # Accept either Detection objects (YOLODetector) or raw dict rows
-        # (LocalObjectRunner); convert the latter so the state manager always
-        # receives Detection instances.
+    def _detect_frame(self, frame) -> list[Detection]:
+        if hasattr(self.detector, "detect_frame"):
+            raw = self.detector.detect_frame(self._frame_idx, frame)
+        elif callable(self.detector):
+            raw = self.detector(frame)
+        else:
+            raise TypeError("realtime detector must expose detect_frame(frame_idx, frame) or be callable")
         if raw and not isinstance(raw[0], Detection):
             from soccer_edge.video.detector import detections_from_rows
 
-            detections = detections_from_rows(raw, self._frame_idx, confidence_threshold=self.state.confidence_floor)
-        else:
-            detections = raw
+            return detections_from_rows(raw, self._frame_idx, confidence_threshold=self.state.confidence_floor)
+        return raw
+
+    def process_frame(self, frame, timestamp_seconds: float | None = None) -> list[TrackState]:
+        detections = self._detect_frame(frame)
         t = timestamp_seconds if timestamp_seconds is not None else float(self._frame_idx)
         states = self.state.ingest(self._frame_idx, t, detections)
         self._frame_idx += 1
