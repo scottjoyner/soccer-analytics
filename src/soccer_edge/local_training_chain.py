@@ -10,7 +10,7 @@ from soccer_edge.models.registry import write_registry_index, write_registry_sum
 from soccer_edge.models.run_summary import write_run_summary
 from soccer_edge.models.simple_classifier import fit_simple_classifier
 from soccer_edge.models.tensor_samples import build_npz_from_table
-from soccer_edge.video.local_catalog import write_local_video_catalog
+from soccer_edge.video.local_catalog import PROCESSABLE_RIGHTS, write_local_video_catalog
 
 
 def run_local_training_chain(
@@ -27,6 +27,12 @@ def run_local_training_chain(
     order_column: str | None = None,
     detection_source: Path | None = None,
 ) -> dict[str, Path]:
+    if rights_status in PROCESSABLE_RIGHTS and not rights_reference:
+        raise ValueError(
+            "rights_reference is required for local training chain footage cataloging; "
+            "record the license/ownership reference before processing local video."
+        )
+
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = write_local_video_catalog(
         footage_root, output_dir / "local_video_manifest.csv", rights_status=rights_status, rights_reference=rights_reference
