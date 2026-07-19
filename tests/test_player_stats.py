@@ -8,6 +8,7 @@ from soccer_edge.player_stats import (
     build_player_form_features,
     build_player_match_stats,
     build_team_player_feature_table,
+    normalize_lineup_players,
     write_player_match_stats,
 )
 
@@ -25,6 +26,61 @@ def test_build_player_match_stats_from_statsbomb_like_rows() -> None:
     assert player_a["shots"] == 1
     assert player_a["goals"] == 1
     assert player_a["completed_passes"] == 1
+    assert player_a["shots_per_90"] == 0
+    assert player_a["shots_per_observed90"] > 0
+
+
+def test_build_player_match_stats_uses_real_minutes_for_per_90() -> None:
+    events = pd.DataFrame(
+        [
+            {"match_id": 1, "player_id": 7, "player_name": "A", "team_name": "Home", "event_type": "Shot", "shot_outcome": "Goal", "minutes_played": 45},
+        ]
+    )
+    stats = build_player_match_stats(events)
+    player_a = stats.iloc[0]
+    assert player_a["minutes_played"] == 45
+    assert player_a["shots_per_90"] == 2
+
+
+def test_lineup_positions_set_starter_and_minutes() -> None:
+    lineup = pd.DataFrame(
+        [
+            {
+                "team_name": "Home",
+                "lineup": [
+                    {"player_id": 7, "player_name": "A", "positions": [{"from": "00:00", "to": "45:00"}]},
+                    {"player_id": 8, "player_name": "B", "positions": [{"from": "60:00", "to": "90:00"}]},
+                ],
+            }
+        ]
+    )
+    players = normalize_lineup_players(lineup)
+    assert players[players["player_id"] == 7]["is_expected_starter"].iloc[0] == 1
+    assert players[players["player_id"] == 7]["minutes_played"].iloc[0] == 45
+    assert players[players["player_id"] == 8]["is_expected_starter"].iloc[0] == 0
+
+
+def test_build_player_match_stats_uses_lineup_minutes() -> None:
+    events = pd.DataFrame(
+        [
+            {"match_id": 1, "player": {"id": 7, "name": "A"}, "team": {"name": "Home"}, "type": {"name": "Shot"}, "minute": 10},
+        ]
+    )
+    lineup = pd.DataFrame(
+        [
+            {
+                "team_name": "Home",
+                "lineup": [
+                    {"player_id": 7, "player_name": "A", "positions": [{"from": "00:00", "to": "90:00"}]},
+                ],
+            }
+        ]
+    )
+    stats = build_player_match_stats(events, lineup=lineup)
+    row = stats.iloc[0]
+    assert row["is_expected_starter"] == 1
+    assert row["minutes_played"] == 90
+    assert row["shots_per_90"] == 1
 
 
 def test_build_player_form_features() -> None:
