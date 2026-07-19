@@ -42,14 +42,7 @@ def read_metrics_table(path: Path) -> pd.DataFrame:
 
 
 def resolve_baseline_rate(frame: pd.DataFrame, majority_baseline_rate: float | None) -> tuple[float, str | None]:
-    """Resolve the baseline accuracy to compare against.
-
-    When ``majority_baseline_rate`` is explicitly given it wins. Otherwise the
-    recorded ``baseline_accuracy`` column (written by the eval-to-metrics bridge)
-    is used, so the gate cannot be trivially passed by forgetting to supply a
-    baseline. If neither is available, this raises (it never silently falls back
-    to 0.0) so a no-baseline model cannot slip through the gate.
-    """
+    """Resolve the baseline accuracy to compare against."""
 
     if majority_baseline_rate is not None:
         return float(majority_baseline_rate), None
@@ -69,6 +62,11 @@ def beats_majority_baseline(
     min_accuracy_lift: float = 0.0,
 ) -> tuple[bool, list[str]]:
     if path is None or not nonempty_file(path):
+        if majority_baseline_rate is not None or min_accuracy_lift > 0:
+            return False, [
+                "predictive metrics are required when checking majority-baseline lift; "
+                "run `soccer-edge model evaluate --output ...` or `soccer-edge model eval-to-metrics ...`."
+            ]
         return True, []
     frame = read_metrics_table(path)
     if "accuracy" not in frame.columns:
@@ -87,8 +85,10 @@ def beats_majority_baseline(
 
 
 def brier_within_threshold(path: Path | None, max_brier: float | None = None) -> tuple[bool, list[str]]:
-    if path is None or max_brier is None or not nonempty_file(path):
+    if max_brier is None:
         return True, []
+    if path is None or not nonempty_file(path):
+        return False, ["predictive metrics are required when --max-brier is set"]
     frame = read_metrics_table(path)
     if "brier" not in frame.columns:
         return True, ["no brier column; skipping calibration check"]
