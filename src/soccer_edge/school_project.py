@@ -261,7 +261,7 @@ def write_project_report(output_path: Path, result: TunedProjectResult, source: 
         f"- Calibration metrics: `{paths.calibration_metrics}`",
         f"- Model card: `{paths.model_card}`",
         f"- Data card: `{paths.data_card}`",
-        f"- Paper draft: `docs/school_project_arxiv_paper.md`",
+        f"- Paper draft: `docs/school_project_arxiv_paper.md` and `paper/school_project_arxiv.tex`",
         "",
         "## Academic integrity note",
         "This workflow reports generated artifacts from the local run. Do not edit metrics upward manually; rerun the workflow after changing data or features.",
@@ -324,7 +324,7 @@ def run_school_project(
         "school-project-soccer-outcome-dataset",
         [source],
         output_dir / "DATA_CARD.md",
-        rights_status="classroom_demo_or_verified_source",
+        rights_status="owned",
         version_paths=[source],
     )
     registry = write_registry_index(output_dir, output_dir / "registry.csv")
