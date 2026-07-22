@@ -31,6 +31,8 @@ jobs:
         run: pytest tests/test_correction_merge.py tests/test_object_confusion.py tests/test_local_finetune_plan.py tests/test_graph_export_dataset_payloads.py tests/test_cli_review_extensions.py
       - name: Source player promotion smoke tests
         run: pytest tests/test_correction_review_ui.py tests/test_graph_payload_files.py tests/test_promotion_gate.py tests/test_player_stats.py tests/test_raw_data_sources.py tests/test_cli_source_player_promotion.py
+      - name: School project smoke tests
+        run: pytest tests/test_school_project.py tests/test_openfootball_loader.py tests/test_realtime_callable_detector.py
       - name: Run ruff
         run: ruff check src tests
 
