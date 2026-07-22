@@ -1,0 +1,112 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+
+\title{Fine-Tuning and Calibration Analysis of a Soccer Match Outcome Prediction Model}
+\author{Scott Joyner\\Course Project Submission}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This project develops a reproducible soccer analytics pipeline for training, tuning, and evaluating a match outcome prediction model. The system converts soccer match-level features into a supervised learning table, performs task-specific fine-tuning through a regularization sweep, exports held-out predictions, and analyzes scoring quality using accuracy, log loss, multiclass Brier score, and confidence-bin calibration. The final implementation records dataset version hashes, model metadata, model and data cards, and a paper-ready run summary. The project supports verified open soccer data sources and also includes a small classroom-safe demonstration fixture so that the workflow can be reproduced without restricted video or paid data access.
+\end{abstract}
+
+\section{Introduction}
+Soccer outcome prediction is challenging because results depend on shot quality, player form, tactical pressure, rest, and stochastic events. A useful project system should therefore do more than output a label: it should document the data source, train and tune a model, score predictions on held-out examples, and report whether predicted probabilities are well calibrated.
+
+This project builds an end-to-end local workflow for soccer match outcome prediction. The broader repository includes open-data ingestion, rights-gated local video processing, player and team feature generation, model training, calibration review, and promotion checks. The final school-project workflow focuses on a lightweight model that can run without optional GPU, computer-vision, or deep-learning dependencies.
+
+\section{Data}
+The workflow can be pointed at verified open or local data. For reproducibility, the repository includes \texttt{examples/school\_project\_training.csv}, a classroom-safe fixture containing match-level features: recent shots, expected-goal proxy features, player-form proxy features, pressure indexes, rest days, and a three-class result label: home win (H), draw (D), or away win (A).
+
+The run creates SHA-256 dataset version records and a data card, making the model output traceable to the exact input table used for the experiment.
+
+\section{Feature Representation}
+Each match is represented by a fixed-length vector
+\[
+  x_i = [s_h, s_a, xg_h, xg_a, f_h, f_a, p_h, p_a, r_h, r_a],
+\]
+where $s$ denotes recent shot volume, $xg$ expected-goal proxy features, $f$ player-form proxy features, $p$ pressure index features, and $r$ rest days. The target is a three-way categorical outcome:
+\[
+  y_i \in \{H, D, A\}.
+\]
+
+\section{Fine-Tuning Method}
+The submitted workflow uses a standardized multinomial logistic-regression classifier. The model is fine-tuned by sweeping inverse regularization strength:
+\[
+  C \in \{0.01, 0.1, 1.0, 10.0\}.
+\]
+For each candidate, the workflow trains on a stratified training split and evaluates on a held-out test split. The selected model maximizes held-out accuracy with log loss as the tie-breaker.
+
+\section{Evaluation Metrics}
+Accuracy measures the fraction of correctly classified held-out matches:
+\[
+  \text{Accuracy}=\frac{1}{n}\sum_{i=1}^{n}\mathbf{1}(\hat{y}_i=y_i).
+\]
+Log loss penalizes confident incorrect probability estimates:
+\[
+  \text{LogLoss}=-\frac{1}{n}\sum_{i=1}^{n}\log p_{i,y_i}.
+\]
+The multiclass Brier score measures squared probability error across classes:
+\[
+  \text{Brier}=\frac{1}{n}\sum_{i=1}^{n}\sum_{k=1}^{K}(p_{i,k}-\mathbf{1}[y_i=k])^2.
+\]
+The workflow also writes confidence-bin calibration tables that compare average confidence against empirical accuracy.
+
+\section{Reproducible Experiment}
+Run the experiment from the repository root:
+\begin{verbatim}
+python -m soccer_edge.school_project \
+  --source examples/school_project_training.csv \
+  --output-dir data/processed/school_project
+\end{verbatim}
+
+The command exports \texttt{metrics.json}, \texttt{predictions.csv}, \texttt{hyperparameter\_results.csv}, \texttt{confidence\_bins.csv}, model/data cards, the final model artifact, and \texttt{PROJECT\_RUN\_SUMMARY.md}.
+
+\section{Results}
+After running the workflow, copy the exact values from \texttt{data/processed/school\_project/metrics.json} into Table~\ref{tab:results}. Values should not be manually inflated; if the model is changed, rerun the workflow and report the new artifacts.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Metric & Value from local run \\
+\midrule
+Selected regularization $C$ & See \texttt{metrics.json} \\
+Held-out accuracy & See \texttt{metrics.json} \\
+Held-out log loss & See \texttt{metrics.json} \\
+Held-out multiclass Brier score & See \texttt{metrics.json} \\
+Training rows & See \texttt{metrics.json} \\
+Test rows & See \texttt{metrics.json} \\
+\bottomrule
+\end{tabular}
+\caption{Final project run metrics.}
+\label{tab:results}
+\end{table}
+
+\section{Discussion}
+The workflow emphasizes probability quality rather than only class accuracy. A model can classify the most common class frequently while still assigning poor probabilities. Log loss, Brier score, and confidence-bin calibration expose this behavior and make the scoring analysis more complete.
+
+The hyperparameter sweep demonstrates task-specific fine-tuning: stronger regularization can underfit, while weaker regularization can overfit. The selected model is the best held-out candidate under the project scoring rule.
+
+\section{Limitations}
+The bundled fixture is a reproducible classroom dataset, not a production-scale forecasting dataset. A stronger extension would train on larger verified open datasets, include true player minutes from lineups, add opponent-adjusted player form, and compare several model families. The repository intentionally avoids unauthorized video scraping; computer-vision workflows are rights-gated and should only be used with owned, licensed, or compatible-license footage.
+
+\section{Conclusion}
+This project provides a reproducible soccer prediction workflow that trains and tunes a model, exports held-out predictions, evaluates probability quality, and packages the results into an auditable submission artifact. The same workflow can be extended from the classroom fixture to verified open or licensed soccer datasets.
+
+\begin{thebibliography}{9}
+\bibitem{statsbomb} StatsBomb Open Data. Public soccer event and lineup data for research and analysis.
+\bibitem{metrica} Metrica Sports Sample Data. Public sample tracking and event data.
+\bibitem{openfootball} OpenFootball football.json. Open match result and fixture JSON data.
+\bibitem{football_data} football-data.co.uk. Historical football results and CSV data.
+\bibitem{soccernet} SoccerNet. Benchmark datasets for soccer video understanding and game-state reconstruction.
+\end{thebibliography}
+
+\end{document}
