@@ -24,8 +24,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, log_loss
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from soccer_edge.cards import write_data_card, write_model_card
 from soccer_edge.dataset_versioning import write_dataset_versions
@@ -109,6 +109,17 @@ def confidence_bins_frame(predictions: pd.DataFrame, bins: int = 5) -> pd.DataFr
     return out
 
 
+def calibration_ready_predictions(predictions: pd.DataFrame, class_labels: list[str]) -> pd.DataFrame:
+    """Return a numeric-label frame compatible with the shared calibration writer."""
+
+    label_to_idx = {label: idx for idx, label in enumerate(class_labels)}
+    frame = predictions.copy()
+    frame["label_text"] = frame["label"].astype(str)
+    frame["prediction_text"] = frame["prediction"].astype(str)
+    frame["label"] = frame["label_text"].map(label_to_idx).astype(int)
+    return frame
+
+
 def validated_features(frame: pd.DataFrame, requested: list[str] | None, label_column: str) -> list[str]:
     selected = requested or [column for column in DEFAULT_FEATURE_COLUMNS if column in frame.columns]
     if not selected:
@@ -187,7 +198,6 @@ def tune_prediction_model(
         metrics, predictions = evaluate_model(model, test, feature_columns, label_column)
         row = {"C": c_value, **metrics}
         results.append(row)
-        # Primary objective: maximize accuracy. Tie-breaker: lower log-loss.
         score = (metrics["accuracy"], -metrics["log_loss"])
         if best_score is None or score > best_score:
             best_score = score
@@ -221,12 +231,7 @@ def write_metrics_files(result: TunedProjectResult, output_dir: Path) -> tuple[P
     return metrics_json, metrics_csv
 
 
-def write_project_report(
-    output_path: Path,
-    result: TunedProjectResult,
-    source: Path,
-    paths: ProjectRunPaths,
-) -> Path:
+def write_project_report(output_path: Path, result: TunedProjectResult, source: Path, paths: ProjectRunPaths) -> Path:
     lines = [
         "# Final Project Run Summary",
         "",
@@ -290,7 +295,7 @@ def run_school_project(
     )
 
     model_dir = output_dir / "tuned_prediction_model"
-    bundle_paths = save_bundle(
+    save_bundle(
         model=model,
         output_dir=model_dir,
         name="school_project_tuned_soccer_predictor",
@@ -299,7 +304,6 @@ def run_school_project(
         metrics={"accuracy": result.accuracy, "log_loss": result.log_loss, "brier": result.brier},
         notes="Task-specific tuned soccer prediction model for final project submission.",
     )
-    # Keep a direct model copy with an obvious name for graders browsing artifacts.
     joblib.dump(model, output_dir / "final_model.joblib")
 
     dataset_versions = write_dataset_versions([source], output_dir / "dataset_versions.csv")
@@ -310,7 +314,8 @@ def run_school_project(
     metrics_json, metrics_csv = write_metrics_files(result, output_dir)
 
     calibration_dir = output_dir / "calibration_review"
-    calibration_paths = write_calibration_review(predictions, calibration_dir, num_bins=5)
+    calibration_frame = calibration_ready_predictions(predictions, result.class_labels)
+    calibration_paths = write_calibration_review(calibration_frame, calibration_dir, num_bins=5)
     bins_path = output_dir / "confidence_bins.csv"
     confidence_bins_frame(predictions).to_csv(bins_path, index=False)
 
